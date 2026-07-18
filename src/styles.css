@@ -291,7 +291,7 @@
   opacity: 0.9;
 }
 .minimap-node:hover circle:nth-of-type(2) { filter: drop-shadow(0 0 4px rgba(255,255,255,0.8)); }
-.minimap-current { animation: currentRing 2.4s ease-in-out infinite; transform-origin: center; }
+.minimap-current { stroke: rgba(255,255,255,0.55); }
 
 /* Fullscreen chart overlay */
 .minimap-fullscreen {
