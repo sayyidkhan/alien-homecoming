@@ -17,10 +17,10 @@ export const Route = createFileRoute("/api/generate-realm")({
           body: JSON.stringify({
             model: "openai/gpt-image-2",
             prompt,
-            size: "1536x1024",
-            quality: "high",
+            size: "1024x1024",
+            quality: "low",
             stream: true,
-            partial_images: 2,
+            partial_images: 3,
           }),
 
         });

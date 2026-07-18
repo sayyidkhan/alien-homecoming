@@ -40,6 +40,10 @@ export function getPrewarmServerSnapshot(): PrewarmJob[] {
   return EMPTY_SNAPSHOT;
 }
 
+export function getJobForSeed(seed: string): PrewarmJob | null {
+  return jobs.get(seed) ?? null;
+}
+
 function readLS(seed: string): string | null {
   try {
     return typeof window !== "undefined" ? localStorage.getItem(LS_PREFIX + seed) : null;
@@ -116,8 +120,8 @@ export function ensureRealmArt(
             frames++;
             const j = jobs.get(seed);
             if (j) {
-              // Assume ~3 partial frames before final; cap at 0.9.
-              j.progress = Math.min(0.9, frames / 3);
+              // partial_images=3 → up to 3 partials before final; cap at 0.9.
+              j.progress = Math.min(0.9, frames / 4);
               emit();
             }
           }
