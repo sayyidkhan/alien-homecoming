@@ -157,8 +157,6 @@ export function RealmView({
           Realm painting…
         </div>
       )}
-      {/* Suppress unused fallback var when loading uses its own visuals */}
-      <span className="hidden" aria-hidden data-fallback={fallback} />
 
       {/* Discoveries */}
       {realm.discoveries.map((d) =>
