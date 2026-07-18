@@ -10,7 +10,7 @@ const provider = new PlaceholderImageProvider();
 const artCache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
 
-const LS_PREFIX = "realm-art:";
+const LS_PREFIX = "realm-art-v2:";
 function readLS(seed: string): string | null {
   try {
     return typeof window !== "undefined" ? localStorage.getItem(LS_PREFIX + seed) : null;
