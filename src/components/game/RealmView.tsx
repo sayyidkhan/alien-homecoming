@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealmNode, Portal, Discovery } from "@/game/types";
-import { PlaceholderImageProvider, svgToDataUri } from "@/game/imageProvider";
 import { Alien } from "./Alien";
 import { streamRealmImage, buildRealmPrompt } from "@/lib/streamRealmImage";
-
-const provider = new PlaceholderImageProvider();
 
 // In-memory cache of generated realm art (keyed by realm.seed).
 const artCache = new Map<string, string>();
