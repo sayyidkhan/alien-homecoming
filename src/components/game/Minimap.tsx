@@ -32,13 +32,14 @@ export function Minimap({
   onJump: (realmId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [mode, setMode] = useState<ViewMode>("2d");
   // Static tilt angle for 3D; user can drag to rotate.
   const [yaw, setYaw] = useState(-0.4);
   const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
 
   const layout = useMemo(() => positionNodes(state), [state]);
-  const size = expanded ? 520 : 240;
+  const size = fullscreen ? undefined : expanded ? 520 : 240;
   const svgSize = 400;
 
   const depthMap = useMemo(() => computeDepths(state), [state]);
