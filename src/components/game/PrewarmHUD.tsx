@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import {
   getPrewarmSnapshot,
+  getPrewarmServerSnapshot,
   subscribePrewarm,
   type PrewarmJob,
 } from "@/lib/realmArtCache";
@@ -9,7 +10,7 @@ function usePrewarmJobs(): PrewarmJob[] {
   return useSyncExternalStore(
     subscribePrewarm,
     getPrewarmSnapshot,
-    () => [],
+    getPrewarmServerSnapshot,
   );
 }
 
