@@ -249,9 +249,9 @@ export function RealmView({
         );
       })}
 
-      {/* Back-portal breadcrumb hint */}
+      {/* Back-portal breadcrumb hint — pulses in from time to time */}
       {realm.portals.some((p) => p.id.startsWith("portal_back_")) && (
-        <div className="pointer-events-none absolute bottom-4 left-4 z-30 rounded-full border border-cyan-200/25 bg-black/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.28em] text-cyan-100/90 backdrop-blur toast-in">
+        <div className="back-guide-hint pointer-events-none absolute bottom-4 left-4 z-30 rounded-full border border-cyan-200/25 bg-black/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.28em] text-cyan-100/90 backdrop-blur">
           ↩ Glowing blue portal returns you the way you came
         </div>
       )}
