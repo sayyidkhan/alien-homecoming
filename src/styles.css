@@ -293,6 +293,52 @@
 .minimap-node:hover circle:nth-of-type(2) { filter: drop-shadow(0 0 4px rgba(255,255,255,0.8)); }
 .minimap-current { animation: currentRing 2.4s ease-in-out infinite; transform-origin: center; }
 
+/* Fullscreen chart overlay */
+.minimap-fullscreen {
+  position: fixed !important;
+  inset: 24px !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 22px;
+  z-index: 90;
+}
+
+/* Sun animations */
+@keyframes sunPulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.12); opacity: 0.85; }
+}
+@keyframes sunPulseSoft {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.75; }
+}
+@keyframes rayDrift {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes rayDriftReverse {
+  from { transform: rotate(360deg); }
+  to   { transform: rotate(0deg); }
+}
+@keyframes twinklePulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes accretionSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.sun-halo { transform-origin: center; animation: sunPulse 4.5s ease-in-out infinite; }
+.sun-halo-soft { transform-origin: center; animation: sunPulseSoft 5.5s ease-in-out infinite; }
+.sun-rays { transform-origin: center; animation: rayDrift 32s linear infinite; }
+.sun-rays-reverse { transform-origin: center; animation: rayDriftReverse 48s linear infinite; }
+.star-twinkle { transform-origin: center; animation: twinklePulse 3.2s ease-in-out infinite; }
+.blackhole-disk { transform-origin: center; animation: accretionSpin 14s linear infinite; }
+
+
 
 /* Hide default focus outlines only when we render our own */
 button:focus { outline: none; }
@@ -300,8 +346,11 @@ button:focus-visible { outline: 2px solid rgba(255,240,200,0.6); outline-offset:
 
 @media (prefers-reduced-motion: reduce) {
   .alien-bob, .alien-celebrate, .clue-sparkle, .realm-particles,
-  .minimap-current, .transition-warp { animation: none !important; }
+  .minimap-current, .transition-warp,
+  .sun-halo, .sun-halo-soft, .sun-rays, .sun-rays-reverse,
+  .star-twinkle, .blackhole-disk { animation: none !important; }
 }
+
 
 /* Realm loading screen */
 .loading-starfield {
