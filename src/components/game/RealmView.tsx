@@ -43,7 +43,6 @@ export function RealmView({
   onDiscovery: (d: Discovery) => void;
   disabled?: boolean;
 }) {
-  const fallback = useMemo(() => svgToDataUri(provider.render(realm)), [realm]);
   const cachedInit = artCache.get(realm.seed) ?? readLS(realm.seed) ?? null;
   const [art, setArt] = useState<string | null>(cachedInit);
   const [isFinal, setIsFinal] = useState<boolean>(!!cachedInit);
