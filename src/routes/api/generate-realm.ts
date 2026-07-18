@@ -18,10 +18,11 @@ export const Route = createFileRoute("/api/generate-realm")({
             model: "openai/gpt-image-2",
             prompt,
             size: "1536x1024",
-            quality: "low",
+            quality: "high",
             stream: true,
             partial_images: 2,
           }),
+
         });
         if (!upstream.ok || !upstream.body) {
           return new Response(await upstream.text(), { status: upstream.status });
