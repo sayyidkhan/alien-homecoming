@@ -121,20 +121,50 @@ export function Minimap({
     });
   }, [state.realms, projected]);
 
-  // Drag to rotate (3D only)
+  // Drag to rotate (3D) or pan (both modes with shift/middle, or when zoomed)
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.shiftKey || e.button === 1 || (mode === "2d" && zoom > 1.01)) {
+      panRef.current = { x: e.clientX, y: e.clientY, startX: pan.x, startY: pan.y };
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
     if (mode !== "3d") return;
     dragRef.current = { x: e.clientX, startYaw: yaw };
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (panRef.current) {
+      const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+      const scale = svgSize / zoom / rect.width;
+      setPan({
+        x: panRef.current.startX - (e.clientX - panRef.current.x) * scale,
+        y: panRef.current.startY - (e.clientY - panRef.current.y) * scale,
+      });
+      return;
+    }
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.x;
     setYaw(dragRef.current.startYaw + dx * 0.01);
   };
   const onPointerUp = () => {
     dragRef.current = null;
+    panRef.current = null;
   };
+  const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    setZoom((z) => Math.min(6, Math.max(0.5, z * factor)));
+  };
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setYaw(-0.4);
+  };
+
+  const viewSize = svgSize / zoom;
+  const viewX = (svgSize - viewSize) / 2 + pan.x;
+  const viewY = (svgSize - viewSize) / 2 + pan.y;
+
 
   return (
     <div
