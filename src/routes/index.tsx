@@ -5,6 +5,7 @@ import { RealmView } from "@/components/game/RealmView";
 import { Minimap } from "@/components/game/Minimap";
 import { HUD, DiscoveryToast } from "@/components/game/HUD";
 import { Transition } from "@/components/game/Transition";
+import { WorldAtlas } from "@/components/game/WorldAtlas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,6 +59,7 @@ function GameInner() {
 
   const [toast, setToast] = useState<string | null>(null);
   const [intro, setIntro] = useState(state.visitedRealmIds.length === 1);
+  const [atlasOpen, setAtlasOpen] = useState(false);
 
   useEffect(() => {
     if (!intro) return;
@@ -123,6 +125,20 @@ function GameInner() {
       />
       <DiscoveryToast message={toast} />
       <Minimap state={state} onJump={handleJump} />
+      <button
+        type="button"
+        onClick={() => setAtlasOpen(true)}
+        className="absolute bottom-4 right-4 z-40 rounded-full border border-white/15 bg-black/45 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-white/80 backdrop-blur-md hover:bg-black/70 hover:text-white"
+      >
+        atlas · {state.visitedRealmIds.length} worlds
+      </button>
+      {atlasOpen && (
+        <WorldAtlas
+          state={state}
+          onClose={() => setAtlasOpen(false)}
+          onJump={handleJump}
+        />
+      )}
       {transitioning && (
         <Transition
           label={transitioning.label}
