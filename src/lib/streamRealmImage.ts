@@ -6,15 +6,37 @@ type ImageEventPayload =
   | { type: "image_generation.completed"; b64_json: string }
   | { type: "error"; error: { message: string } };
 
+function imageModelForAttempt(attempt: number) {
+  return attempt === 1 ? "openai/gpt-image-2" : "google/gemini-3.1-flash-lite-image";
+}
+
 export async function streamRealmImage(
   prompt: string,
   onFrame: (dataUrl: string, isFinal: boolean) => void,
   signal?: AbortSignal,
 ): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await streamRealmImageAttempt(prompt, onFrame, signal, imageModelForAttempt(attempt));
+    } catch (error) {
+      lastError = error;
+      if (signal?.aborted) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Image generation failed");
+}
+
+async function streamRealmImageAttempt(
+  prompt: string,
+  onFrame: (dataUrl: string, isFinal: boolean) => void,
+  signal: AbortSignal | undefined,
+  model: string,
+): Promise<string> {
   const res = await fetch("/api/generate-realm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, model }),
     signal,
   });
   if (!res.ok || !res.body) {
