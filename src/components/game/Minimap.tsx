@@ -565,6 +565,100 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
   }
 }
 
+type ViewModeType = ViewMode;
+function ControlBar({
+  mode,
+  setMode,
+  setZoom,
+  resetView,
+  expanded,
+  fullscreen,
+  setExpanded,
+  setFullscreen,
+  stacked = false,
+}: {
+  mode: ViewModeType;
+  setMode: (m: ViewModeType) => void;
+  setZoom: (updater: (z: number) => number) => void;
+  resetView: () => void;
+  expanded: boolean;
+  fullscreen: boolean;
+  setExpanded: (v: boolean) => void;
+  setFullscreen: (v: boolean) => void;
+  stacked?: boolean;
+}) {
+  const wrap = stacked
+    ? "flex flex-col items-stretch gap-2"
+    : "flex items-center gap-2";
+  return (
+    <div className={wrap}>
+      <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
+        <button
+          type="button"
+          onClick={() => setMode("2d")}
+          className={`flex-1 px-2 py-0.5 transition-colors ${
+            mode === "2d" ? "bg-white/90 text-black" : "text-white/70 hover:text-white"
+          }`}
+        >
+          2d
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("3d")}
+          className={`flex-1 px-2 py-0.5 transition-colors ${
+            mode === "3d" ? "bg-white/90 text-black" : "text-white/70 hover:text-white"
+          }`}
+        >
+          3d
+        </button>
+      </div>
+      <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
+          aria-label="zoom out"
+          className="flex-1 px-2 py-0.5 hover:bg-white/10 hover:text-white"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+          aria-label="zoom in"
+          className="flex-1 border-l border-white/15 px-2 py-0.5 hover:bg-white/10 hover:text-white"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          aria-label="recenter on start"
+          className="flex-1 border-l border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
+        >
+          home
+        </button>
+      </div>
+      {!fullscreen && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+        >
+          {expanded ? "shrink" : "expand"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setFullscreen(!fullscreen)}
+        aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
+        className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+      >
+        {fullscreen ? "close" : "full"}
+      </button>
+    </div>
+  );
+}
+
 
 function Dot({
   color,
