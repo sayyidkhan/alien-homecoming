@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import type { AdventureState, Realm } from "@/game/types";
+import type { AdventureState, RealmNode } from "@/game/types";
 
 type ViewMode = "2d" | "3d";
 
