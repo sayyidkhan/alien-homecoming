@@ -224,3 +224,52 @@ button:focus-visible { outline: 2px solid rgba(255,240,200,0.6); outline-offset:
   .alien-bob, .alien-celebrate, .clue-sparkle, .realm-particles,
   .minimap-current, .transition-warp { animation: none !important; }
 }
+
+/* Realm loading screen */
+.loading-starfield {
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.9), transparent 60%),
+    radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 40% 60%, rgba(255,240,200,0.8), transparent 60%),
+    radial-gradient(1px 1px at 85% 20%, rgba(200,220,255,0.8), transparent 60%),
+    radial-gradient(1px 1px at 15% 75%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1px 1px at 55% 15%, rgba(255,255,255,0.7), transparent 60%);
+  background-size: 100% 100%;
+  animation: driftParticles 60s linear infinite;
+  opacity: 0.9;
+}
+.loading-nebula {
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(140, 90, 200, 0.35), transparent 55%),
+    radial-gradient(ellipse at 70% 60%, rgba(80, 140, 220, 0.28), transparent 55%),
+    radial-gradient(ellipse at 50% 80%, rgba(220, 140, 180, 0.22), transparent 60%);
+  animation: nebulaPulse 8s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes nebulaPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.05); }
+}
+.loading-orb-core {
+  background: radial-gradient(circle at 40% 35%, #fff 0%, #ffe6b0 30%, #c99aff 65%, transparent 80%);
+  box-shadow: 0 0 60px 10px rgba(210, 170, 255, 0.55), 0 0 120px 30px rgba(120, 90, 200, 0.35);
+  animation: orbPulse 2.4s ease-in-out infinite;
+}
+.loading-orb-ring {
+  border: 1px solid rgba(255,255,255,0.35);
+  animation: orbSpin 6s linear infinite;
+  transform: scale(1.35);
+}
+.loading-orb-ring-2 {
+  border: 1px dashed rgba(255,220,180,0.35);
+  animation: orbSpin 10s linear reverse infinite;
+  transform: scale(1.7);
+}
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1);    filter: brightness(1); }
+  50%      { transform: scale(1.08); filter: brightness(1.15); }
+}
+@keyframes orbSpin {
+  from { transform: rotate(0deg)   scale(var(--s, 1.35)); }
+  to   { transform: rotate(360deg) scale(var(--s, 1.35)); }
+}

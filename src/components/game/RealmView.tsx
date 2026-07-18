@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealmNode, Portal, Discovery } from "@/game/types";
-import { PlaceholderImageProvider, svgToDataUri } from "@/game/imageProvider";
 import { Alien } from "./Alien";
 import { streamRealmImage, buildRealmPrompt } from "@/lib/streamRealmImage";
-
-const provider = new PlaceholderImageProvider();
 
 // In-memory cache of generated realm art (keyed by realm.seed).
 const artCache = new Map<string, string>();
@@ -43,7 +40,6 @@ export function RealmView({
   onDiscovery: (d: Discovery) => void;
   disabled?: boolean;
 }) {
-  const fallback = useMemo(() => svgToDataUri(provider.render(realm)), [realm]);
   const cachedInit = artCache.get(realm.seed) ?? readLS(realm.seed) ?? null;
   const [art, setArt] = useState<string | null>(cachedInit);
   const [isFinal, setIsFinal] = useState<boolean>(!!cachedInit);
@@ -130,17 +126,6 @@ export function RealmView({
       className="relative h-full w-full overflow-hidden cursor-crosshair select-none"
       style={{ backgroundColor: "#05030f" }}
     >
-      {/* Fallback SVG scene, always present underneath */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `url("${fallback}")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          opacity: isFinal ? 0 : 0.6,
-          transition: "opacity 800ms ease",
-        }}
-      />
       {/* Generated painting */}
       {art && (
         <div
@@ -160,8 +145,11 @@ export function RealmView({
       {/* Ambient particles overlay */}
       <div className="pointer-events-none absolute inset-0 realm-particles" />
 
-      {/* Painting-in indicator */}
-      {!isFinal && (
+      {/* Loading screen — shown until first pixels arrive */}
+      {!art && <RealmLoading title={realm.title} />}
+
+      {/* Painting-in indicator (after first partial pixels) */}
+      {art && !isFinal && (
         <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-full bg-black/40 backdrop-blur px-3 py-1 text-[10px] tracking-[0.25em] uppercase text-white/80 toast-in">
           Realm painting…
         </div>
@@ -227,6 +215,37 @@ export function RealmView({
       })}
 
       <Alien x={alienX} y={alienY} facing={facing} celebrating={justCelebrated} />
+    </div>
+  );
+}
+
+function RealmLoading({ title }: { title: string }) {
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#05030f]">
+      <div className="loading-starfield absolute inset-0" />
+      <div className="loading-nebula absolute inset-0" />
+      <div className="relative flex flex-col items-center gap-6">
+        <div className="loading-orb relative h-28 w-28">
+          <div className="loading-orb-core absolute inset-0 rounded-full" />
+          <div className="loading-orb-ring absolute inset-0 rounded-full" />
+          <div className="loading-orb-ring-2 absolute inset-0 rounded-full" />
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-[0.4em] text-white/60">
+            Painting a new universe
+          </div>
+          <div className="mt-2 font-serif text-2xl text-white/95">{title}</div>
+        </div>
+        <div className="flex gap-2">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="h-1.5 w-1.5 rounded-full bg-white/80"
+              style={{ animation: `pulseDot 1.2s ${i * 0.15}s infinite` }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
