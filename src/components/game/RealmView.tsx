@@ -11,7 +11,7 @@ import {
 import { planRealm } from "@/game/realmPlanner";
 
 function useSeedProgress(seed: string): {
-  status: "queued" | "painting" | "idle";
+  status: "queued" | "waiting" | "painting" | "retrying" | "idle";
   progress: number;
   createdAt?: number;
   startedAt?: number;
@@ -270,12 +270,20 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
   const statusLine =
     status === "queued"
       ? `Queued for ${elapsed}s · waiting for an image slot`
+      : status === "waiting"
+        ? "Another traveller is painting this realm · reusing their finished art"
+        : status === "retrying"
+          ? "The painter stepped away · safely claiming the next attempt"
       : progress > 0
         ? `Painting for ${paintingElapsed}s · last pixels ${frameElapsed}s ago`
         : `Contacting painter · ${elapsed}s elapsed`;
   const label =
     status === "queued"
       ? "Queued · waiting for a painter"
+      : status === "waiting"
+        ? "Another traveller is painting this realm"
+        : status === "retrying"
+          ? "Retrying this realm safely"
       : progress > 0
         ? `Painting · ${pct}%`
         : "Painting a new universe";
@@ -307,6 +315,10 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
               width:
                 status === "queued"
                   ? "6%"
+                  : status === "waiting"
+                    ? "20%"
+                    : status === "retrying"
+                      ? "15%"
                   : progress > 0
                     ? `${Math.max(8, pct)}%`
                     : "12%",

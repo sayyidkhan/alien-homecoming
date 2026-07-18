@@ -3,22 +3,17 @@ import type { AdventureState, HomeEcho, Portal, RealmConnection, RealmNode } fro
 import { loadAdventure, saveAdventure, clearAdventure } from "./storage";
 import { ECHO_LIBRARY, planRealm, planStartingRealm, STARTING_REALM_ID } from "./realmPlanner";
 import { hashString } from "./seed";
-import {
-  initialiseSharedWorld,
-  saveSharedWorld,
-  subscribeToSharedWorld,
-  WorldConflictError,
-  type SharedWorldSnapshot,
-} from "@/lib/worldApi";
 
 const WAY_HOME_PORTAL_ID = "portal_way_home";
 const REAL_HOME_REALM_ID = "realm_home";
+// This is intentionally stable. Realm seeds are derived from it and the route a
+// traveller takes, so every device resolves the same canonical universe art.
+const UNIVERSE_VERSION = "lost-between-worlds-v1";
 
 function makeInitialAdventure(): AdventureState {
-  const adventureId = `adv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const start = planStartingRealm(adventureId);
+  const start = planStartingRealm(UNIVERSE_VERSION);
   return {
-    adventureId,
+    adventureId: UNIVERSE_VERSION,
     version: 1,
     currentRealmId: start.id,
     homeRealmId: start.id,
@@ -76,43 +71,6 @@ export function useAdventure() {
     label: string;
   }>(null);
   const lastSaved = useRef(0);
-  const initialState = useRef(state);
-  const remoteRevision = useRef<number | null>(null);
-  const pendingSharedSync = useRef(false);
-
-  const applySharedSnapshot = useCallback((snapshot: SharedWorldSnapshot) => {
-    remoteRevision.current = snapshot.revision;
-    setState(snapshot.state);
-  }, []);
-
-  const syncSharedWorld = useCallback(
-    (nextState: AdventureState) => {
-      void saveSharedWorld(nextState, remoteRevision.current)
-        .then((snapshot) => {
-          if (snapshot) applySharedSnapshot(snapshot);
-        })
-        .catch((error: unknown) => {
-          if (error instanceof WorldConflictError) {
-            applySharedSnapshot(error.snapshot);
-            return;
-          }
-          // The local copy remains playable if the shared service is temporarily unavailable.
-          console.warn("Unable to sync shared world", error);
-        });
-    },
-    [applySharedSnapshot],
-  );
-
-  // Bootstrap once. The first player creates the global adventure; everyone else joins it.
-  useEffect(() => {
-    void initialiseSharedWorld(initialState.current)
-      .then((snapshot) => {
-        if (snapshot) applySharedSnapshot(snapshot);
-      })
-      .catch((error: unknown) => console.warn("Unable to load shared world", error));
-  }, [applySharedSnapshot]);
-
-  useEffect(() => subscribeToSharedWorld(applySharedSnapshot), [applySharedSnapshot]);
 
   // Persist.
   useEffect(() => {
@@ -125,13 +83,6 @@ export function useAdventure() {
       return () => window.clearTimeout(t);
     }
   }, [state]);
-
-  // Only actions that change the collective adventure set this flag. Walking stays device-local.
-  useEffect(() => {
-    if (!pendingSharedSync.current) return;
-    pendingSharedSync.current = false;
-    syncSharedWorld(state);
-  }, [state, syncSharedWorld]);
 
   // Reveal way-home portal when echoes reach 3.
   useEffect(() => {
@@ -146,7 +97,6 @@ export function useAdventure() {
   }, []);
 
   const collectDiscovery = useCallback((discoveryId: string) => {
-    pendingSharedSync.current = true;
     setState((s) => {
       const realm = s.realms[s.currentRealmId];
       if (!realm) return s;
@@ -176,7 +126,6 @@ export function useAdventure() {
   }, []);
 
   const enterPortal = useCallback((portalId: string) => {
-    pendingSharedSync.current = true;
     setState((prev) => {
       const from = prev.realms[prev.currentRealmId];
       if (!from) return prev;
@@ -328,7 +277,6 @@ export function useAdventure() {
   );
 
   const jumpToRealm = useCallback((realmId: string) => {
-    pendingSharedSync.current = true;
     setState((s) => {
       const dest = s.realms[realmId];
       if (!dest) return s;
@@ -356,7 +304,6 @@ export function useAdventure() {
   }, [transitioning, enterPortal, jumpToRealm]);
 
   const resetAdventure = useCallback(() => {
-    pendingSharedSync.current = true;
     clearAdventure();
     setState(makeInitialAdventure());
     setTransitioning(null);

@@ -1,13 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "alien-homecoming-world",
+  "name": "alien-homecoming-universe",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-18",
   "workers_dev": true,
   "durable_objects": {
     "bindings": [
       {
-        "name": "WORLD",
+        "name": "ART_COORDINATOR",
         "class_name": "SharedWorld",
       },
     ],
@@ -18,10 +18,16 @@
       "new_sqlite_classes": ["SharedWorld"],
     },
   ],
-  "r2_buckets": [
+  "d1_databases": [
     {
-      "binding": "ART",
-      "bucket_name": "alien-homecoming-art",
+      "binding": "DB",
+      "database_name": "alien-homecoming-universe",
+      "database_id": "816fafe7-dd74-450c-8046-8b1cf305588d",
     },
   ],
+  "vars": {
+    "TIGRIS_ENDPOINT": "https://fly.storage.tigris.dev",
+    "TIGRIS_BUCKET": "alien-homecoming-art",
+    "TIGRIS_REGION": "auto",
+  },
 }

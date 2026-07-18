@@ -56,6 +56,10 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
                   width:
                     j.status === "queued"
                       ? "6%"
+                      : j.status === "waiting"
+                        ? "20%"
+                        : j.status === "retrying"
+                          ? "15%"
                       : `${Math.max(8, Math.round(j.progress * 100))}%`,
                 }}
               />
@@ -63,6 +67,10 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
             <span className="w-20 text-right text-[9px] uppercase tracking-[0.2em] text-white/50">
               {j.status === "queued"
                 ? `queued ${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`
+                : j.status === "waiting"
+                  ? "shared wait"
+                  : j.status === "retrying"
+                    ? "retrying"
                 : `${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`}
             </span>
           </li>

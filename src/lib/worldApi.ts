@@ -1,23 +1,27 @@
-import type { AdventureState } from "@/game/types";
-
-export type SharedWorldSnapshot = {
-  state: AdventureState;
-  revision: number;
-  updatedAt: number;
-};
-
-class WorldConflictError extends Error {
-  snapshot: SharedWorldSnapshot;
-
-  constructor(snapshot: SharedWorldSnapshot) {
-    super("The shared world changed. Reloading the latest state.");
-    this.snapshot = snapshot;
-  }
-}
-
 const configuredApiUrl = import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "");
 
+// Local development uses Wrangler on this port. Production deliberately needs
+// an explicit URL so a preview never accidentally sends work to the wrong world.
 export const worldApiUrl = configuredApiUrl ?? (import.meta.env.DEV ? "http://127.0.0.1:8787" : "");
+
+export type ArtClaim =
+  | { status: "ready"; url: string }
+  | { status: "owner"; leaseId: string; leaseExpiresAt: number }
+  | { status: "waiting"; leaseExpiresAt: number }
+  | { status: "failed"; retryAfterMs: number };
+
+export type ArtUpdate =
+  | { type: "art.updated"; status: "ready"; url: string }
+  | { type: "art.updated"; status: "generating"; leaseExpiresAt: number }
+  | { type: "art.updated"; status: "failed"; retryAfterMs: number };
+
+export type ClaimArtInput = {
+  seed: string;
+  title: string;
+  promptHash: string;
+  parentSeed?: string;
+  portalId?: string;
+};
 
 function endpoint(path: string) {
   return `${worldApiUrl}${path}`;
@@ -25,65 +29,6 @@ function endpoint(path: string) {
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
-}
-
-export async function loadSharedWorld(): Promise<SharedWorldSnapshot | null> {
-  if (!worldApiUrl) return null;
-  const response = await fetch(endpoint("/v1/world"));
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`Unable to load the shared world (${response.status})`);
-  return readJson<SharedWorldSnapshot>(response);
-}
-
-export async function initialiseSharedWorld(
-  state: AdventureState,
-): Promise<SharedWorldSnapshot | null> {
-  if (!worldApiUrl) return null;
-
-  const existing = await loadSharedWorld();
-  if (existing) return existing;
-
-  const response = await fetch(endpoint("/v1/world"), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ state, expectedRevision: null }),
-  });
-
-  if (response.status === 409) return readJson<SharedWorldSnapshot>(response);
-  if (!response.ok) throw new Error(`Unable to initialise the shared world (${response.status})`);
-  return readJson<SharedWorldSnapshot>(response);
-}
-
-export async function saveSharedWorld(
-  state: AdventureState,
-  expectedRevision: number | null,
-): Promise<SharedWorldSnapshot | null> {
-  if (!worldApiUrl) return null;
-
-  const response = await fetch(endpoint("/v1/world"), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ state, expectedRevision }),
-  });
-  const snapshot = await readJson<SharedWorldSnapshot>(response);
-  if (response.status === 409) throw new WorldConflictError(snapshot);
-  if (!response.ok) throw new Error(`Unable to save the shared world (${response.status})`);
-  return snapshot;
-}
-
-export function subscribeToSharedWorld(onSnapshot: (snapshot: SharedWorldSnapshot) => void) {
-  if (!worldApiUrl || typeof window === "undefined") return () => {};
-  const wsUrl = endpoint("/v1/world/live").replace(/^http/, "ws");
-  const socket = new WebSocket(wsUrl);
-  socket.addEventListener("message", (event) => {
-    try {
-      const message = JSON.parse(event.data as string) as { type?: string } & SharedWorldSnapshot;
-      if (message.type === "world.updated") onSnapshot(message);
-    } catch {
-      // Ignore malformed messages; the next committed state will replace it.
-    }
-  });
-  return () => socket.close();
 }
 
 export function sharedArtUrl(seed: string) {
@@ -97,16 +42,51 @@ export async function getSharedArtUrl(seed: string): Promise<string | null> {
   return response.ok ? url : null;
 }
 
-export async function saveSharedArt(seed: string, dataUrl: string): Promise<string | null> {
+export async function claimSharedArt(input: ClaimArtInput): Promise<ArtClaim | null> {
   if (!worldApiUrl) return null;
-  const response = await fetch(endpoint(`/v1/art/${encodeURIComponent(seed)}`), {
-    method: "PUT",
+  const response = await fetch(endpoint(`/v1/art/${encodeURIComponent(input.seed)}/claim`), {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dataUrl }),
+    body: JSON.stringify(input),
   });
-  if (!response.ok) return null;
-  const result = await readJson<{ url?: string }>(response);
-  return result.url ?? null;
+  if (!response.ok) throw new Error(`Unable to claim realm art (${response.status})`);
+  return readJson<ArtClaim>(response);
 }
 
-export { WorldConflictError };
+export async function completeSharedArt(
+  seed: string,
+  leaseId: string,
+  dataUrl: string,
+): Promise<string> {
+  const response = await fetch(endpoint(`/v1/art/${encodeURIComponent(seed)}/complete`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leaseId, dataUrl }),
+  });
+  if (!response.ok) throw new Error(`Unable to store realm art (${response.status})`);
+  const result = await readJson<{ url: string }>(response);
+  return result.url;
+}
+
+export async function failSharedArt(seed: string, leaseId: string): Promise<void> {
+  if (!worldApiUrl) return;
+  await fetch(endpoint(`/v1/art/${encodeURIComponent(seed)}/fail`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leaseId }),
+  });
+}
+
+export function watchSharedArt(seed: string, onUpdate: (update: ArtUpdate) => void) {
+  if (!worldApiUrl || typeof window === "undefined") return () => {};
+  const socket = new WebSocket(endpoint(`/v1/art/${encodeURIComponent(seed)}/live`).replace(/^http/, "ws"));
+  socket.addEventListener("message", (event) => {
+    try {
+      const update = JSON.parse(event.data as string) as ArtUpdate;
+      if (update.type === "art.updated") onUpdate(update);
+    } catch {
+      // A later state event or retry will recover from malformed messages.
+    }
+  });
+  return () => socket.close();
+}
