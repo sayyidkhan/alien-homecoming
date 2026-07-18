@@ -102,7 +102,7 @@ export function RealmView({
       alive = false;
       controller.abort();
     };
-  }, [realm]);
+  }, [realm.seed]);
 
   // Background prewarm: speculatively plan the destination realm for each
   // unexplored portal and start painting its art now, so it's ready (or
