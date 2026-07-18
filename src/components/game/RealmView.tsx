@@ -10,14 +10,38 @@ import {
 } from "@/lib/realmArtCache";
 import { planRealm } from "@/game/realmPlanner";
 
-function useSeedProgress(seed: string): { status: "queued" | "painting" | "idle"; progress: number } {
+function useSeedProgress(seed: string): {
+  status: "queued" | "painting" | "idle";
+  progress: number;
+  createdAt?: number;
+  startedAt?: number;
+  lastFrameAt?: number;
+} {
   const job = useSyncExternalStore(
     subscribePrewarm,
     () => getJobForSeed(seed),
     () => null,
   );
   if (!job) return { status: "idle", progress: 0 };
-  return { status: job.status, progress: job.progress };
+  return {
+    status: job.status,
+    progress: job.progress,
+    createdAt: job.createdAt,
+    startedAt: job.startedAt,
+    lastFrameAt: job.lastFrameAt,
+  };
+}
+
+function useElapsedSeconds(startedAt?: number) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (!startedAt) return 0;
+  return Math.max(0, Math.floor((now - startedAt) / 1000));
 }
 
 export function RealmView({
@@ -230,8 +254,17 @@ export function RealmView({
 }
 
 function RealmLoading({ title, seed }: { title: string; seed: string }) {
-  const { status, progress } = useSeedProgress(seed);
+  const { status, progress, createdAt, startedAt, lastFrameAt } = useSeedProgress(seed);
+  const elapsed = useElapsedSeconds(createdAt);
+  const paintingElapsed = useElapsedSeconds(startedAt);
+  const frameElapsed = useElapsedSeconds(lastFrameAt);
   const pct = Math.round(progress * 100);
+  const statusLine =
+    status === "queued"
+      ? `Queued for ${elapsed}s · waiting for an image slot`
+      : progress > 0
+        ? `Painting for ${paintingElapsed}s · last pixels ${frameElapsed}s ago`
+        : `Contacting painter · ${elapsed}s elapsed`;
   const label =
     status === "queued"
       ? "Queued · waiting for a painter"
@@ -253,6 +286,11 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
             {label}
           </div>
           <div className="mt-2 font-serif text-2xl text-white/95">{title}</div>
+          <div className="mt-3 flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.25em] text-white/60">
+            <span>Elapsed {elapsed}s</span>
+            <span className="h-1 w-1 rounded-full bg-white/35" />
+            <span>{statusLine}</span>
+          </div>
         </div>
         <div className="h-1.5 w-64 overflow-hidden rounded-full bg-white/10">
           <div
@@ -268,7 +306,9 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
           />
         </div>
         <div className="text-[9px] uppercase tracking-[0.3em] text-white/45">
-          first pixels usually arrive in ~5–10s
+          {elapsed > 25
+            ? "still working — this request can take longer when the image service is busy"
+            : "first pixels usually arrive in ~5–10s"}
         </div>
       </div>
     </div>
@@ -276,11 +316,13 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
 }
 
 function PaintingProgress({ seed }: { seed: string }) {
-  const { progress } = useSeedProgress(seed);
+  const { progress, createdAt } = useSeedProgress(seed);
+  const elapsed = useElapsedSeconds(createdAt);
   const pct = Math.max(10, Math.round(progress * 100));
   return (
     <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 rounded-full bg-black/45 backdrop-blur px-4 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/85 toast-in">
       <span>Painting · {pct}%</span>
+      <span>{elapsed}s</span>
       <span className="h-1 w-24 overflow-hidden rounded-full bg-white/10">
         <span
           className="block h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-amber-200 transition-[width] duration-500"
