@@ -1,27 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealmNode, Portal, Discovery } from "@/game/types";
 import { Alien } from "./Alien";
-import { streamRealmImage, buildRealmPrompt } from "@/lib/streamRealmImage";
-
-// In-memory cache of generated realm art (keyed by realm.seed).
-const artCache = new Map<string, string>();
-const inflight = new Map<string, Promise<string>>();
-
-const LS_PREFIX = "realm-art-v2:";
-function readLS(seed: string): string | null {
-  try {
-    return typeof window !== "undefined" ? localStorage.getItem(LS_PREFIX + seed) : null;
-  } catch {
-    return null;
-  }
-}
-function writeLS(seed: string, dataUrl: string) {
-  try {
-    localStorage.setItem(LS_PREFIX + seed, dataUrl);
-  } catch {
-    /* quota — skip */
-  }
-}
+import { buildRealmPrompt } from "@/lib/streamRealmImage";
+import { ensureRealmArt, getCachedArt } from "@/lib/realmArtCache";
+import { planRealm } from "@/game/realmPlanner";
 
 export function RealmView({
   realm,
@@ -31,6 +13,8 @@ export function RealmView({
   onPortalActivate,
   onDiscovery,
   disabled,
+  adventureId,
+  echoesCollected,
 }: {
   realm: RealmNode;
   alienX: number;
@@ -39,8 +23,10 @@ export function RealmView({
   onPortalActivate: (portal: Portal) => void;
   onDiscovery: (d: Discovery) => void;
   disabled?: boolean;
+  adventureId: string;
+  echoesCollected: number;
 }) {
-  const cachedInit = artCache.get(realm.seed) ?? readLS(realm.seed) ?? null;
+  const cachedInit = getCachedArt(realm.seed);
   const [art, setArt] = useState<string | null>(cachedInit);
   const [isFinal, setIsFinal] = useState<boolean>(!!cachedInit);
 
@@ -48,11 +34,10 @@ export function RealmView({
   const [hoverPortal, setHoverPortal] = useState<string | null>(null);
   const [justCelebrated, setJustCelebrated] = useState(false);
 
-  // Kick off generation for this realm if not cached.
+  // Foreground: paint the current realm.
   useEffect(() => {
-    const cached = artCache.get(realm.seed) ?? readLS(realm.seed);
+    const cached = getCachedArt(realm.seed);
     if (cached) {
-      artCache.set(realm.seed, cached);
       setArt(cached);
       setIsFinal(true);
       return;
@@ -62,41 +47,53 @@ export function RealmView({
 
     const controller = new AbortController();
     let alive = true;
-
-    const existing = inflight.get(realm.seed);
-    const task =
-      existing ??
-      streamRealmImage(
-        buildRealmPrompt(realm),
-        (dataUrl, final) => {
-          if (!alive) return;
-          setArt(dataUrl);
-          setIsFinal(final);
-          if (final) {
-            artCache.set(realm.seed, dataUrl);
-            writeLS(realm.seed, dataUrl);
-          }
-        },
-        controller.signal,
-      );
-    if (!existing) inflight.set(realm.seed, task);
-    task
-      .then((finalUrl) => {
-        artCache.set(realm.seed, finalUrl);
-        writeLS(realm.seed, finalUrl);
-      })
-      .catch(() => {
-        /* stay on fallback */
-      })
-      .finally(() => {
-        inflight.delete(realm.seed);
-      });
+    ensureRealmArt(
+      realm.seed,
+      buildRealmPrompt(realm),
+      (dataUrl, final) => {
+        if (!alive) return;
+        setArt(dataUrl);
+        setIsFinal(final);
+      },
+      controller.signal,
+      "foreground",
+    ).catch(() => {});
 
     return () => {
       alive = false;
       controller.abort();
     };
   }, [realm]);
+
+  // Background prewarm: speculatively plan the destination realm for each
+  // unexplored portal and start painting its art now, so it's ready (or
+  // nearly so) when the player clicks through.
+  useEffect(() => {
+    for (const p of realm.portals) {
+      if (p.state === "locked" || p.state === "hidden") continue;
+      if (p.destinationRealmId) continue;
+      if (p.id === "portal_way_home") continue;
+      try {
+        const dest = planRealm({
+          adventureId,
+          parentRealmId: realm.id,
+          enteredThroughPortalId: p.id,
+          depth: realm.depth + 1,
+          echoesCollected,
+        });
+        if (getCachedArt(dest.seed)) continue;
+        ensureRealmArt(
+          dest.seed,
+          buildRealmPrompt(dest),
+          undefined,
+          undefined,
+          "background",
+        ).catch(() => {});
+      } catch {
+        /* ignore planning errors */
+      }
+    }
+  }, [realm, adventureId, echoesCollected]);
 
   const facing = useMemo(() => {
     const hovered = realm.portals.find((p) => p.id === hoverPortal);
