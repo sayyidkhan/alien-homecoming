@@ -134,6 +134,8 @@ export function Minimap({
 
   // Drag to rotate (3D) or pan (both modes with shift/middle, or when zoomed)
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    const target = e.target as Element;
+    if (target.closest?.(".minimap-node")) return; // let node clicks through
     if (e.shiftKey || e.button === 1 || (mode === "2d" && zoom > 1.01)) {
       panRef.current = { x: e.clientX, y: e.clientY, startX: pan.x, startY: pan.y };
       (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
@@ -183,7 +185,7 @@ export function Minimap({
       style={fullscreen ? undefined : { width: size, height: size }}
     >
       <div className="minimap-cosmos" aria-hidden />
-      <div className="relative z-10 flex items-center justify-between px-3 pt-2">
+      <div className="relative z-30 flex items-center justify-between px-3 pt-2">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
           star chart
         </div>
