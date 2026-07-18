@@ -256,6 +256,8 @@ export function Minimap({
         onPointerUp={onPointerUp}
 
         onPointerLeave={onPointerUp}
+        onWheel={onWheel}
+
       >
         <defs>
           {/* Sun (yellow-white) */}
