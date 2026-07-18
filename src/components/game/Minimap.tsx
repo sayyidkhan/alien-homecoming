@@ -15,7 +15,7 @@ function hash(s: string): number {
 
 type Body = "sun-home" | "sun-start" | "star-echo" | "star" | "blackhole";
 
-function classifyBody(r: Realm): Body {
+function classifyBody(r: RealmNode): Body {
   if (r.special === "real_home") return "sun-home";
   if (r.special === "false_home") return "blackhole";
   if (r.special === "start") return "sun-start";
