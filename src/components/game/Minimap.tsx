@@ -1,7 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { AdventureState } from "@/game/types";
+import { useMemo, useRef, useState } from "react";
+import type { AdventureState, Realm } from "@/game/types";
 
 type ViewMode = "2d" | "3d";
+
+// Deterministic pseudo-random from string (for star field & node jitter)
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+type Body = "sun-home" | "sun-start" | "star-echo" | "star" | "blackhole";
+
+function classifyBody(r: Realm): Body {
+  if (r.special === "real_home") return "sun-home";
+  if (r.special === "false_home") return "blackhole";
+  if (r.special === "start") return "sun-start";
+  if (r.discoveries.some((d) => d.kind === "home_echo" && d.found))
+    return "star-echo";
+  return "star";
+}
 
 export function Minimap({
   state,
@@ -12,70 +33,70 @@ export function Minimap({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<ViewMode>("2d");
-  const [yaw, setYaw] = useState(0);
-  const rafRef = useRef<number | null>(null);
+  // Static tilt angle for 3D; user can drag to rotate.
+  const [yaw, setYaw] = useState(-0.4);
+  const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
 
   const layout = useMemo(() => positionNodes(state), [state]);
   const size = expanded ? 520 : 240;
   const svgSize = 400;
 
-  // Auto-rotate in 3D
-  useEffect(() => {
-    if (mode !== "3d") return;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      setYaw((y) => (y + dt * 0.25) % (Math.PI * 2));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [mode]);
-
-  // Depth (BFS) for vertical lift in 3D
   const depthMap = useMemo(() => computeDepths(state), [state]);
 
-  // Project each node to screen coords
-  const projected = useMemo(() => {
-    const out: Record<
-      string,
-      { x: number; y: number; scale: number; z: number }
-    > = {};
-    const tilt = mode === "3d" ? 0.95 : 0; // radians, ~55°
+  // Backdrop starfield — deterministic per session id
+  const starField = useMemo(() => {
+    const seed = state.homeRealmId || "sky";
+    const stars: Array<{ x: number; y: number; r: number; o: number }> = [];
+    for (let i = 0; i < 120; i++) {
+      const a = hash(seed + "sx" + i);
+      const b = hash(seed + "sy" + i);
+      const c = hash(seed + "sr" + i);
+      const d = hash(seed + "so" + i);
+      stars.push({
+        x: a * svgSize,
+        y: b * svgSize,
+        r: 0.2 + c * 0.9,
+        o: 0.15 + d * 0.55,
+      });
+    }
+    return stars;
+  }, [state.homeRealmId]);
+
+  // Project a world point through yaw + tilt + perspective
+  const project = useMemo(() => {
+    const tilt = mode === "3d" ? 0.95 : 0;
     const cosT = Math.cos(tilt);
     const sinT = Math.sin(tilt);
     const cosY = Math.cos(yaw);
     const sinY = Math.sin(yaw);
     const cx = 200;
     const cy = 200;
-    for (const [id, p] of Object.entries(layout)) {
-      // world coords centered
-      const wx = p.x - cx;
-      const wz = p.y - cy;
-      const depth = depthMap[id] ?? 0;
-      const wy = mode === "3d" ? -depth * 22 : 0; // lift outer nodes up
-      // yaw around Y
+    return (wx0: number, wy0: number, wz0: number) => {
+      const wx = wx0 - cx;
+      const wz = wy0 - cy; // input y is z in world
+      const wy = wz0;
       const rx = wx * cosY + wz * sinY;
       const rz = -wx * sinY + wz * cosY;
-      // tilt around X
       const ry = wy * cosT - rz * sinT;
       const rzz = wy * sinT + rz * cosT;
-      // simple perspective
       const persp = 460 / (460 + rzz);
-      out[id] = {
-        x: cx + rx * persp,
-        y: cy + ry * persp,
-        scale: persp,
-        z: rzz,
-      };
+      return { x: cx + rx * persp, y: cy + ry * persp, scale: persp, z: rzz };
+    };
+  }, [mode, yaw]);
+
+  const projected = useMemo(() => {
+    const out: Record<
+      string,
+      { x: number; y: number; scale: number; z: number }
+    > = {};
+    for (const [id, p] of Object.entries(layout)) {
+      const depth = depthMap[id] ?? 0;
+      const lift = mode === "3d" ? -depth * 22 : 0;
+      out[id] = project(p.x, p.y, lift);
     }
     return out;
-  }, [layout, mode, yaw, depthMap]);
+  }, [layout, depthMap, mode, project]);
 
-  // Orbit rings — flat circle in 2D, tilted ellipses in 3D
   const orbitRadii = useMemo(() => {
     const set = new Set<number>();
     for (const p of Object.values(layout)) {
@@ -85,9 +106,8 @@ export function Minimap({
     return [...set].sort((a, b) => a - b);
   }, [layout]);
 
-  const ringTiltY = mode === "3d" ? Math.cos(0.95) : 1; // squash factor
+  const ringSquash = mode === "3d" ? Math.cos(0.95) : 1;
 
-  // Sort nodes back-to-front for painter's algorithm
   const drawOrder = useMemo(() => {
     return Object.values(state.realms).slice().sort((a, b) => {
       const za = projected[a.id]?.z ?? 0;
@@ -95,6 +115,21 @@ export function Minimap({
       return zb - za;
     });
   }, [state.realms, projected]);
+
+  // Drag to rotate (3D only)
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (mode !== "3d") return;
+    dragRef.current = { x: e.clientX, startYaw: yaw };
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    setYaw(dragRef.current.startYaw + dx * 0.01);
+  };
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
 
   return (
     <div
@@ -143,11 +178,48 @@ export function Minimap({
       <svg
         viewBox={`0 0 ${svgSize} ${svgSize}`}
         className="relative z-10 w-full flex-1"
+        style={{ cursor: mode === "3d" ? "grab" : "default" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
       >
         <defs>
+          {/* Sun (yellow-white) */}
+          <radialGradient id="mm-sun-home" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fffbe6" />
+            <stop offset="40%" stopColor="#ffd76a" />
+            <stop offset="100%" stopColor="rgba(255,180,60,0)" />
+          </radialGradient>
+          {/* Blue sun (start) */}
+          <radialGradient id="mm-sun-start" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ecf5ff" />
+            <stop offset="40%" stopColor="#8ab7ff" />
+            <stop offset="100%" stopColor="rgba(80,120,255,0)" />
+          </radialGradient>
+          {/* Echo star (warm) */}
+          <radialGradient id="mm-star-echo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff2d6" />
+            <stop offset="45%" stopColor="#ffbf7a" />
+            <stop offset="100%" stopColor="rgba(255,150,80,0)" />
+          </radialGradient>
+          {/* Ordinary star (pink-violet) */}
+          <radialGradient id="mm-star" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffe4f0" />
+            <stop offset="45%" stopColor="#e7a8c9" />
+            <stop offset="100%" stopColor="rgba(200,120,180,0)" />
+          </radialGradient>
+          {/* Black hole accretion ring */}
+          <radialGradient id="mm-blackhole" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#000000" />
+            <stop offset="55%" stopColor="#000000" />
+            <stop offset="70%" stopColor="#c894ff" />
+            <stop offset="85%" stopColor="rgba(200,148,255,0.3)" />
+            <stop offset="100%" stopColor="rgba(200,148,255,0)" />
+          </radialGradient>
           <radialGradient id="mm-core" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(255,240,210,0.55)" />
-            <stop offset="60%" stopColor="rgba(180,140,255,0.10)" />
+            <stop offset="0%" stopColor="rgba(255,240,210,0.4)" />
+            <stop offset="60%" stopColor="rgba(180,140,255,0.08)" />
             <stop offset="100%" stopColor="rgba(0,0,0,0)" />
           </radialGradient>
           <filter id="mm-glow" x="-60%" y="-60%" width="220%" height="220%">
@@ -159,23 +231,35 @@ export function Minimap({
           </filter>
         </defs>
 
-        {/* galactic core glow */}
+        {/* backdrop stars */}
+        {starField.map((s, i) => (
+          <circle
+            key={i}
+            cx={s.x}
+            cy={s.y}
+            r={s.r}
+            fill="#ffffff"
+            opacity={s.o}
+          />
+        ))}
+
+        {/* galactic core */}
         <ellipse
           cx={200}
           cy={200}
           rx={90}
-          ry={90 * ringTiltY}
+          ry={90 * ringSquash}
           fill="url(#mm-core)"
         />
 
-        {/* orbital rings — tilted ellipses in 3D */}
+        {/* orbital rings */}
         {orbitRadii.map((r) => (
           <ellipse
             key={r}
             cx={200}
             cy={200}
             rx={r}
-            ry={r * ringTiltY}
+            ry={r * ringSquash}
             fill="none"
             stroke="rgba(255,255,255,0.08)"
             strokeWidth={0.6}
@@ -195,69 +279,42 @@ export function Minimap({
               y1={a.y}
               x2={b.x}
               y2={b.y}
-              stroke="rgba(200,180,255,0.35)"
-              strokeWidth={0.9}
+              stroke="rgba(200,180,255,0.28)"
+              strokeWidth={0.8}
               strokeDasharray="2 4"
             />
           );
         })}
 
-        {/* 3D drop-lines from node down to base plane */}
+        {/* 3D drop-lines */}
         {mode === "3d" &&
           drawOrder.map((r) => {
             const p = projected[r.id];
             if (!p) return null;
-            // ground = same node without vertical lift
-            const cx = 200;
-            const wx = layout[r.id].x - cx;
-            const wz = layout[r.id].y - cx;
-            const cosY = Math.cos(yaw);
-            const sinY = Math.sin(yaw);
-            const rx = wx * cosY + wz * sinY;
-            const rz = -wx * sinY + wz * cosY;
-            const sinT = Math.sin(0.95);
-            const cosT = Math.cos(0.95);
-            const ry = -rz * sinT;
-            const rzz = rz * cosT;
-            const persp = 460 / (460 + rzz);
+            const g = project(layout[r.id].x, layout[r.id].y, 0);
             return (
               <line
                 key={`drop-${r.id}`}
                 x1={p.x}
                 y1={p.y}
-                x2={cx + rx * persp}
-                y2={cx + ry * persp}
-                stroke="rgba(255,255,255,0.12)"
+                x2={g.x}
+                y2={g.y}
+                stroke="rgba(255,255,255,0.1)"
                 strokeWidth={0.5}
                 strokeDasharray="1 2"
               />
             );
           })}
 
-        {/* nodes — painter's order */}
+        {/* nodes */}
         {drawOrder.map((r, idx) => {
           const pos = projected[r.id];
           if (!pos) return null;
+          const body = classifyBody(r);
           const isCurrent = r.id === state.currentRealmId;
-          const hasEcho = r.discoveries.some(
-            (d) => d.kind === "home_echo" && d.found,
-          );
           const hasUnfound = r.discoveries.some((d) => !d.found);
-          const isFalseHome = r.special === "false_home";
-          const isRealHome = r.special === "real_home";
-          const isStart = r.special === "start";
-          const fill = isRealHome
-            ? "#fff2c8"
-            : isFalseHome
-              ? "#c894ff"
-              : isStart
-                ? "#a8c5ff"
-                : hasEcho
-                  ? "#ffd9a8"
-                  : "#e7a8c9";
-
           const labelBelow = idx % 2 === 0;
-          const labelY = labelBelow ? 20 : -14;
+          const labelY = labelBelow ? 22 : -16;
           const title = truncate(r.title, expanded ? 22 : 14);
           const labelW = Math.max(38, title.length * 5.2);
           const s = pos.scale;
@@ -268,26 +325,20 @@ export function Minimap({
               transform={`translate(${pos.x}, ${pos.y}) scale(${s})`}
               className="cursor-pointer minimap-node"
               onClick={() => onJump(r.id)}
-              opacity={0.4 + 0.6 * s}
+              opacity={0.45 + 0.55 * s}
             >
-              <circle r={11} fill={fill} opacity={0.18} filter="url(#mm-glow)" />
+              <CelestialBody body={body} seed={r.id} />
               {isCurrent && (
                 <circle
-                  r={13}
+                  r={15}
                   fill="none"
                   stroke="#fff"
-                  strokeWidth={1.2}
+                  strokeWidth={1.1}
                   className="minimap-current"
                 />
               )}
-              <circle
-                r={5.5}
-                fill={fill}
-                stroke="rgba(10,6,24,0.9)"
-                strokeWidth={0.8}
-              />
               {hasUnfound && (
-                <circle r={2} cx={5} cy={-5} fill="#fff" opacity={0.95} />
+                <circle r={1.5} cx={7} cy={-7} fill="#fff" opacity={0.95} />
               )}
               <g transform={`translate(0, ${labelY})`}>
                 <rect
@@ -316,17 +367,103 @@ export function Minimap({
         })}
       </svg>
       <div className="relative z-10 flex flex-wrap gap-x-3 gap-y-1 px-3 pb-2 text-[9px] uppercase tracking-widest text-white/60">
-        <span><Dot color="#a8c5ff" /> start</span>
-        <span><Dot color="#e7a8c9" /> realm</span>
-        <span><Dot color="#ffd9a8" /> echo</span>
-        <span><Dot color="#c894ff" /> false</span>
-        <span><Dot color="#fff2c8" /> home</span>
+        <span><Dot color="#8ab7ff" /> start</span>
+        <span><Dot color="#e7a8c9" /> star</span>
+        <span><Dot color="#ffbf7a" /> echo</span>
+        <span><Dot color="#c894ff" ring /> hole</span>
+        <span><Dot color="#ffd76a" /> home</span>
+        {mode === "3d" && (
+          <span className="opacity-60">· drag to rotate</span>
+        )}
       </div>
     </div>
   );
 }
 
-function Dot({ color }: { color: string }) {
+function CelestialBody({ body, seed }: { body: Body; seed: string }) {
+  const jitter = hash(seed);
+  switch (body) {
+    case "sun-home":
+      return (
+        <>
+          <circle r={14} fill="url(#mm-sun-home)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle r={6} fill="#fffbe6" />
+          {/* corona rays */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const a = (i / 8) * Math.PI * 2 + jitter;
+            return (
+              <line
+                key={i}
+                x1={Math.cos(a) * 7}
+                y1={Math.sin(a) * 7}
+                x2={Math.cos(a) * 12}
+                y2={Math.sin(a) * 12}
+                stroke="#ffe08a"
+                strokeWidth={0.7}
+                opacity={0.75}
+              />
+            );
+          })}
+        </>
+      );
+    case "sun-start":
+      return (
+        <>
+          <circle r={12} fill="url(#mm-sun-start)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle r={5.5} fill="#ecf5ff" />
+          <circle r={5.5} fill="none" stroke="#a8c5ff" strokeWidth={0.8} opacity={0.9} />
+        </>
+      );
+    case "star-echo":
+      return (
+        <>
+          <circle r={11} fill="url(#mm-star-echo)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle r={4.5} fill="#fff2d6" />
+          {/* four-point twinkle */}
+          <path
+            d="M0,-9 L1,-1 L9,0 L1,1 L0,9 L-1,1 L-9,0 L-1,-1 Z"
+            fill="#ffdfa8"
+            opacity={0.85}
+          />
+        </>
+      );
+    case "star":
+      return (
+        <>
+          <circle r={10} fill="url(#mm-star)" opacity={0.5} filter="url(#mm-glow)" />
+          <circle r={4} fill="#ffe4f0" />
+          <path
+            d="M0,-6 L0.7,-0.7 L6,0 L0.7,0.7 L0,6 L-0.7,0.7 L-6,0 L-0.7,-0.7 Z"
+            fill="#f4c9de"
+            opacity={0.9}
+          />
+        </>
+      );
+    case "blackhole":
+      return (
+        <>
+          {/* accretion disk (ellipse for depth) */}
+          <ellipse rx={13} ry={4.5} fill="none" stroke="#c894ff" strokeWidth={1.2} opacity={0.85} />
+          <ellipse rx={13} ry={4.5} fill="none" stroke="#f5d6ff" strokeWidth={0.4} opacity={0.9} />
+          {/* halo */}
+          <circle r={11} fill="url(#mm-blackhole)" opacity={0.9} />
+          {/* event horizon */}
+          <circle r={4.5} fill="#000" />
+          <circle r={4.5} fill="none" stroke="#c894ff" strokeWidth={0.5} opacity={0.9} />
+        </>
+      );
+  }
+}
+
+function Dot({ color, ring }: { color: string; ring?: boolean }) {
+  if (ring) {
+    return (
+      <span
+        className="inline-block h-2 w-2 rounded-full align-middle"
+        style={{ background: "#000", boxShadow: `0 0 0 1px ${color}, 0 0 6px ${color}` }}
+      />
+    );
+  }
   return (
     <span
       className="inline-block h-2 w-2 rounded-full align-middle"
