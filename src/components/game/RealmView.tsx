@@ -217,13 +217,14 @@ export function RealmView({
           height: `${p.shape.h * 100}%`,
         };
         const locked = p.state === "locked";
+        const isBack = p.id.startsWith("portal_back_");
         return (
           <button
             key={p.id}
             type="button"
             className={`portal-hit group absolute z-20 rounded-2xl outline-none ${
               locked ? "portal-locked" : "portal-available"
-            }`}
+            } ${isBack ? "portal-back" : ""}`}
             style={style}
             onMouseEnter={() => setHoverPortal(p.id)}
             onMouseLeave={() => setHoverPortal((h) => (h === p.id ? null : h))}
@@ -237,14 +238,23 @@ export function RealmView({
             aria-label={`${p.title}${locked ? " (locked)" : ""}`}
           >
             <span className="portal-glow" />
+            {isBack && <span className="portal-back-arrow" aria-hidden>↩</span>}
             <span className="portal-label">
+              {isBack ? "◂ " : ""}
               {p.title}
-              {p.destinationRealmId ? " · known" : ""}
+              {!isBack && p.destinationRealmId ? " · known" : ""}
               {locked ? " · sealed" : ""}
             </span>
           </button>
         );
       })}
+
+      {/* Back-portal breadcrumb hint */}
+      {realm.portals.some((p) => p.id.startsWith("portal_back_")) && (
+        <div className="pointer-events-none absolute bottom-4 left-4 z-30 rounded-full border border-cyan-200/25 bg-black/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.28em] text-cyan-100/90 backdrop-blur toast-in">
+          ↩ Glowing blue portal returns you the way you came
+        </div>
+      )}
 
       <Alien x={alienX} y={alienY} facing={facing} celebrating={justCelebrated} />
     </div>
