@@ -150,6 +150,41 @@ function pump() {
   }
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchSharedArt(seed: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/realm-art/${encodeURIComponent(seed)}`);
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.startsWith("image/")) return null;
+    const blob = await res.blob();
+    return await blobToDataUrl(blob);
+  } catch {
+    return null;
+  }
+}
+
+async function publishSharedArt(seed: string, dataUrl: string, title: string) {
+  try {
+    await fetch(`/api/realm-art/${encodeURIComponent(seed)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl, title }),
+    });
+  } catch {
+    /* best-effort — device cache still works */
+  }
+}
+
+
 export function ensureRealmArt(
   seed: string,
   prompt: string,
