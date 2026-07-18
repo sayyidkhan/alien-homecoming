@@ -5,6 +5,7 @@ const MAX_CONCURRENT = 2;
 
 const artCache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
+const frameListeners = new Map<string, Set<(dataUrl: string, isFinal: boolean) => void>>();
 const queue: Array<{ seed: string; run: () => void }> = [];
 let active = 0;
 
@@ -13,6 +14,9 @@ export type PrewarmJob = {
   title: string;
   status: "queued" | "painting";
   progress: number; // 0..1 (partial frames count / expected)
+  createdAt: number;
+  startedAt?: number;
+  lastFrameAt?: number;
 };
 
 const jobs = new Map<string, PrewarmJob>();
@@ -42,6 +46,19 @@ export function getPrewarmServerSnapshot(): PrewarmJob[] {
 
 export function getJobForSeed(seed: string): PrewarmJob | null {
   return jobs.get(seed) ?? null;
+}
+
+function addFrameListener(
+  seed: string,
+  listener: (dataUrl: string, isFinal: boolean) => void,
+) {
+  const listeners = frameListeners.get(seed) ?? new Set();
+  listeners.add(listener);
+  frameListeners.set(seed, listeners);
+}
+
+function notifyFrameListeners(seed: string, dataUrl: string, isFinal: boolean) {
+  frameListeners.get(seed)?.forEach((listener) => listener(dataUrl, isFinal));
 }
 
 function readLS(seed: string): string | null {
@@ -93,12 +110,14 @@ export function ensureRealmArt(
 
   const existing = inflight.get(seed);
   if (existing) {
+    if (onFrame) addFrameListener(seed, onFrame);
     if (onFrame) existing.then((url) => onFrame(url, true)).catch(() => {});
     return existing;
   }
 
   // Register the job so the HUD can show it.
-  jobs.set(seed, { seed, title, status: "queued", progress: 0 });
+  jobs.set(seed, { seed, title, status: "queued", progress: 0, createdAt: Date.now() });
+  if (onFrame) addFrameListener(seed, onFrame);
   emit();
 
   const task = new Promise<string>((resolve, reject) => {
@@ -107,6 +126,7 @@ export function ensureRealmArt(
       const job = jobs.get(seed);
       if (job) {
         job.status = "painting";
+        job.startedAt = Date.now();
         emit();
       }
       let frames = 0;
@@ -122,10 +142,11 @@ export function ensureRealmArt(
             if (j) {
               // partial_images=3 → up to 3 partials before final; cap at 0.9.
               j.progress = Math.min(0.9, frames / 4);
+              j.lastFrameAt = Date.now();
               emit();
             }
           }
-          onFrame?.(dataUrl, final);
+          notifyFrameListeners(seed, dataUrl, final);
         },
         signal,
       )
@@ -138,6 +159,7 @@ export function ensureRealmArt(
         .finally(() => {
           active--;
           inflight.delete(seed);
+          frameListeners.delete(seed);
           jobs.delete(seed);
           emit();
           pump();
