@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   getPrewarmSnapshot,
   getPrewarmServerSnapshot,
@@ -14,8 +14,18 @@ function usePrewarmJobs(): PrewarmJob[] {
   );
 }
 
+function useNow() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return now;
+}
+
 export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
   const jobs = usePrewarmJobs();
+  const now = useNow();
   // Hide the foreground realm's own job — that already has a full-screen loader.
   const bg = jobs.filter((j) => j.seed !== currentSeed);
   if (bg.length === 0) return null;
@@ -32,6 +42,10 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
       <ul className="flex flex-col gap-1.5 min-w-[220px]">
         {bg.map((j) => (
           <li key={j.seed} className="flex items-center gap-3">
+            {(() => {
+              const elapsed = Math.max(0, Math.floor((now - j.createdAt) / 1000));
+              return null;
+            })()}
             <span
               className="truncate font-serif text-xs text-white/90"
               style={{ maxWidth: 180 }}
@@ -50,8 +64,8 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
                 }}
               />
             </div>
-            <span className="w-14 text-right text-[9px] uppercase tracking-[0.2em] text-white/50">
-              {j.status === "queued" ? "queued" : "painting"}
+            <span className="w-20 text-right text-[9px] uppercase tracking-[0.2em] text-white/50">
+              {j.status === "queued" ? "queued" : `${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`}
             </span>
           </li>
         ))}
