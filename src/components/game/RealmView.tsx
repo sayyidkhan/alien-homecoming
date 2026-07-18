@@ -224,3 +224,34 @@ export function RealmView({
     </div>
   );
 }
+
+function RealmLoading({ title }: { title: string }) {
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#05030f]">
+      <div className="loading-starfield absolute inset-0" />
+      <div className="loading-nebula absolute inset-0" />
+      <div className="relative flex flex-col items-center gap-6">
+        <div className="loading-orb relative h-28 w-28">
+          <div className="loading-orb-core absolute inset-0 rounded-full" />
+          <div className="loading-orb-ring absolute inset-0 rounded-full" />
+          <div className="loading-orb-ring-2 absolute inset-0 rounded-full" />
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-[0.4em] text-white/60">
+            Painting a new universe
+          </div>
+          <div className="mt-2 font-serif text-2xl text-white/95">{title}</div>
+        </div>
+        <div className="flex gap-2">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="h-1.5 w-1.5 rounded-full bg-white/80"
+              style={{ animation: `pulseDot 1.2s ${i * 0.15}s infinite` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
