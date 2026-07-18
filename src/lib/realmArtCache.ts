@@ -150,6 +150,41 @@ function pump() {
   }
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchSharedArt(seed: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/realm-art/${encodeURIComponent(seed)}`);
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.startsWith("image/")) return null;
+    const blob = await res.blob();
+    return await blobToDataUrl(blob);
+  } catch {
+    return null;
+  }
+}
+
+async function publishSharedArt(seed: string, dataUrl: string, title: string) {
+  try {
+    await fetch(`/api/realm-art/${encodeURIComponent(seed)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl, title }),
+    });
+  } catch {
+    /* best-effort — device cache still works */
+  }
+}
+
+
 export function ensureRealmArt(
   seed: string,
   prompt: string,
@@ -215,9 +250,11 @@ export function ensureRealmArt(
           artCache.set(seed, finalUrl);
           writeLS(seed, finalUrl);
           void writeIDB(seed, finalUrl);
+          void publishSharedArt(seed, finalUrl, title);
           resolve(finalUrl);
         })
         .catch((err) => reject(err))
+
         .finally(() => {
           active--;
           inflight.delete(seed);
@@ -233,20 +270,34 @@ export function ensureRealmArt(
       pump();
     };
 
-    readIDB(seed)
-      .then((disk) => {
-        if (disk) {
-          artCache.set(seed, disk);
-          notifyFrameListeners(seed, disk, true);
-          resolve(disk);
-          inflight.delete(seed);
-          frameListeners.delete(seed);
-          return;
-        }
-        startNetworkJob();
-      })
-      .catch(startNetworkJob);
+    (async () => {
+      // 1. Persistent per-device cache.
+      const disk = await readIDB(seed).catch(() => null);
+      if (disk) {
+        artCache.set(seed, disk);
+        notifyFrameListeners(seed, disk, true);
+        resolve(disk);
+        inflight.delete(seed);
+        frameListeners.delete(seed);
+        return;
+      }
+      // 2. Shared server-side library (populated by whoever painted this seed first).
+      const shared = await fetchSharedArt(seed).catch(() => null);
+      if (shared) {
+        artCache.set(seed, shared);
+        writeLS(seed, shared);
+        void writeIDB(seed, shared);
+        notifyFrameListeners(seed, shared, true);
+        resolve(shared);
+        inflight.delete(seed);
+        frameListeners.delete(seed);
+        return;
+      }
+      // 3. Paint from scratch.
+      startNetworkJob();
+    })();
   });
+
 
   inflight.set(seed, task);
   return task;

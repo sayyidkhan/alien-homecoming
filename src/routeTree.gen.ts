@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiGenerateRealmRouteImport } from './routes/api/generate-realm'
+import { Route as ApiRealmArtSeedRouteImport } from './routes/api/realm-art/$seed'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ApiGenerateRealmRoute = ApiGenerateRealmRouteImport.update({
   path: '/api/generate-realm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRealmArtSeedRoute = ApiRealmArtSeedRouteImport.update({
+  id: '/api/realm-art/$seed',
+  path: '/api/realm-art/$seed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/generate-realm': typeof ApiGenerateRealmRoute
+  '/api/realm-art/$seed': typeof ApiRealmArtSeedRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/generate-realm': typeof ApiGenerateRealmRoute
+  '/api/realm-art/$seed': typeof ApiRealmArtSeedRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/generate-realm': typeof ApiGenerateRealmRoute
+  '/api/realm-art/$seed': typeof ApiRealmArtSeedRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/generate-realm'
+  fullPaths: '/' | '/api/generate-realm' | '/api/realm-art/$seed'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/generate-realm'
-  id: '__root__' | '/' | '/api/generate-realm'
+  to: '/' | '/api/generate-realm' | '/api/realm-art/$seed'
+  id: '__root__' | '/' | '/api/generate-realm' | '/api/realm-art/$seed'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiGenerateRealmRoute: typeof ApiGenerateRealmRoute
+  ApiRealmArtSeedRoute: typeof ApiRealmArtSeedRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,23 +75,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateRealmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/realm-art/$seed': {
+      id: '/api/realm-art/$seed'
+      path: '/api/realm-art/$seed'
+      fullPath: '/api/realm-art/$seed'
+      preLoaderRoute: typeof ApiRealmArtSeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiGenerateRealmRoute: ApiGenerateRealmRoute,
+  ApiRealmArtSeedRoute: ApiRealmArtSeedRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
