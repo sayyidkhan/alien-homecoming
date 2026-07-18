@@ -36,7 +36,11 @@ export function Minimap({
   const [mode, setMode] = useState<ViewMode>("2d");
   // Static tilt angle for 3D; user can drag to rotate.
   const [yaw, setYaw] = useState(-0.4);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+
 
   const layout = useMemo(() => positionNodes(state), [state]);
   const size = fullscreen ? undefined : expanded ? 520 : 240;
@@ -117,20 +121,50 @@ export function Minimap({
     });
   }, [state.realms, projected]);
 
-  // Drag to rotate (3D only)
+  // Drag to rotate (3D) or pan (both modes with shift/middle, or when zoomed)
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.shiftKey || e.button === 1 || (mode === "2d" && zoom > 1.01)) {
+      panRef.current = { x: e.clientX, y: e.clientY, startX: pan.x, startY: pan.y };
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
     if (mode !== "3d") return;
     dragRef.current = { x: e.clientX, startYaw: yaw };
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (panRef.current) {
+      const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+      const scale = svgSize / zoom / rect.width;
+      setPan({
+        x: panRef.current.startX - (e.clientX - panRef.current.x) * scale,
+        y: panRef.current.startY - (e.clientY - panRef.current.y) * scale,
+      });
+      return;
+    }
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.x;
     setYaw(dragRef.current.startYaw + dx * 0.01);
   };
   const onPointerUp = () => {
     dragRef.current = null;
+    panRef.current = null;
   };
+  const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    setZoom((z) => Math.min(6, Math.max(0.5, z * factor)));
+  };
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setYaw(-0.4);
+  };
+
+  const viewSize = svgSize / zoom;
+  const viewX = (svgSize - viewSize) / 2 + pan.x;
+  const viewY = (svgSize - viewSize) / 2 + pan.y;
+
 
   return (
     <div
@@ -167,6 +201,32 @@ export function Minimap({
               3d
             </button>
           </div>
+          <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
+              aria-label="zoom out"
+              className="px-2 py-0.5 hover:bg-white/10 hover:text-white"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+              aria-label="zoom in"
+              className="px-2 py-0.5 border-l border-white/15 hover:bg-white/10 hover:text-white"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              aria-label="recenter on start"
+              className="px-2 py-0.5 border-l border-white/15 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
+            >
+              home
+            </button>
+          </div>
           {!fullscreen && (
             <button
               type="button"
@@ -188,13 +248,16 @@ export function Minimap({
       </div>
 
       <svg
-        viewBox={`0 0 ${svgSize} ${svgSize}`}
-        className="relative z-10 w-full flex-1"
-        style={{ cursor: mode === "3d" ? "grab" : "default" }}
+        viewBox={`${viewX} ${viewY} ${viewSize} ${viewSize}`}
+        className="relative z-10 w-full flex-1 touch-none"
+        style={{ cursor: panRef.current ? "grabbing" : mode === "3d" || zoom > 1.01 ? "grab" : "default" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+
         onPointerLeave={onPointerUp}
+        onWheel={onWheel}
+
       >
         <defs>
           {/* Sun (yellow-white) */}
@@ -326,9 +389,10 @@ export function Minimap({
           const isCurrent = r.id === state.currentRealmId;
           const hasUnfound = r.discoveries.some((d) => !d.found);
           const labelBelow = idx % 2 === 0;
-          const labelY = labelBelow ? 26 : -20;
-          const title = truncate(r.title, fullscreen ? 30 : expanded ? 24 : 16);
-          const fontSize = fullscreen ? 9 : 8;
+          const labelY = labelBelow ? 22 : -16;
+          const title = truncate(r.title, fullscreen ? 26 : expanded ? 20 : 14);
+          const fontSize = (fullscreen ? 7 : 6) / Math.max(0.75, Math.min(zoom, 1.6));
+
           const labelW = Math.max(44, title.length * (fontSize * 0.72));
           const s = pos.scale;
 
