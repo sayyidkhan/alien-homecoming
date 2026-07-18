@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { RealmNode, Portal, Discovery } from "@/game/types";
 import { Alien } from "./Alien";
 import { buildRealmPrompt } from "@/lib/streamRealmImage";
-import { ensureRealmArt, getCachedArt } from "@/lib/realmArtCache";
+import {
+  ensureRealmArt,
+  getCachedArt,
+  subscribePrewarm,
+  getJobForSeed,
+} from "@/lib/realmArtCache";
 import { planRealm } from "@/game/realmPlanner";
+
+function useSeedProgress(seed: string): { status: "queued" | "painting" | "idle"; progress: number } {
+  const job = useSyncExternalStore(
+    subscribePrewarm,
+    () => getJobForSeed(seed),
+    () => null,
+  );
+  if (!job) return { status: "idle", progress: 0 };
+  return { status: job.status, progress: job.progress };
+}
 
 export function RealmView({
   realm,
