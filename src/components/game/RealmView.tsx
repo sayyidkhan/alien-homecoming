@@ -130,17 +130,6 @@ export function RealmView({
       className="relative h-full w-full overflow-hidden cursor-crosshair select-none"
       style={{ backgroundColor: "#05030f" }}
     >
-      {/* Fallback SVG scene, always present underneath */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `url("${fallback}")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          opacity: isFinal ? 0 : 0.6,
-          transition: "opacity 800ms ease",
-        }}
-      />
       {/* Generated painting */}
       {art && (
         <div
@@ -160,12 +149,17 @@ export function RealmView({
       {/* Ambient particles overlay */}
       <div className="pointer-events-none absolute inset-0 realm-particles" />
 
-      {/* Painting-in indicator */}
-      {!isFinal && (
+      {/* Loading screen — shown until first pixels arrive */}
+      {!art && <RealmLoading title={realm.title} />}
+
+      {/* Painting-in indicator (after first partial pixels) */}
+      {art && !isFinal && (
         <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-full bg-black/40 backdrop-blur px-3 py-1 text-[10px] tracking-[0.25em] uppercase text-white/80 toast-in">
           Realm painting…
         </div>
       )}
+      {/* Suppress unused fallback var when loading uses its own visuals */}
+      <span className="hidden" aria-hidden data-fallback={fallback} />
 
       {/* Discoveries */}
       {realm.discoveries.map((d) =>
