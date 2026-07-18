@@ -53,20 +53,16 @@ function Game() {
     (d: { id: string; kind: "home_echo" | "clue"; title: string; description: string }) => {
       collectDiscovery(d.id);
       setToast(
-        d.kind === "home_echo"
-          ? `Home Echo found — ${d.title}`
-          : d.title,
+        d.kind === "home_echo" ? `Home Echo · ${d.title}` : d.title,
       );
-      window.setTimeout(() => setToast(null), 4200);
     },
     [collectDiscovery],
   );
 
   const handlePortalActivate = useCallback(
     (portal: { id: string; title: string; shape: { x: number; y: number; w: number; h: number } }) => {
-      // walk alien toward portal, then start warp
       const targetX = Math.max(0.08, Math.min(0.92, portal.shape.x + portal.shape.w / 2));
-      const targetY = Math.max(0.55, Math.min(0.82, portal.shape.y + portal.shape.h / 2 + 0.08));
+      const targetY = Math.max(0.55, Math.min(0.84, portal.shape.y + portal.shape.h / 2 + 0.08));
       moveAlien(targetX, targetY);
       window.setTimeout(() => beginTransition(portal.id, portal.title), 550);
     },
@@ -76,41 +72,13 @@ function Game() {
   const handleJump = useCallback(
     (realmId: string) => {
       if (realmId === state.currentRealmId) return;
-      // Only allow jumps to already-visited realms (backtracking).
       if (!state.visitedRealmIds.includes(realmId)) return;
-      // Find any connection between current and target for label; else use realm title.
       const dest = state.realms[realmId];
       if (!dest) return;
       beginTransition(`__jump__${realmId}`, dest.title);
     },
     [state.currentRealmId, state.visitedRealmIds, state.realms, beginTransition],
   );
-
-  // Intercept jump-transition finish: perform jump instead of enterPortal.
-  const finishTransitionWithJump = useCallback(() => {
-    if (!transitioning) return;
-    if (transitioning.portalId.startsWith("__jump__")) {
-      const realmId = transitioning.portalId.replace("__jump__", "");
-      // Directly relocate.
-      const dest = state.realms[realmId];
-      if (dest) {
-        // Piggyback: fake portal traversal by setting alien and current realm via reset trick.
-        // We'll use a lightweight state mutation through resetAdventure-safe path:
-        // Simpler: set via localStorage-free approach — dispatch a custom event.
-        // Instead, we call a small internal by using the same hook: not clean. Use custom side effect.
-        window.dispatchEvent(
-          new CustomEvent("lbw:jump-to", { detail: { realmId } }),
-        );
-      }
-      // clear transition
-      finishTransition(); // this will try enterPortal(__jump__...) which fails silently (no such portal). Then setTransitioning(null).
-      return;
-    }
-    finishTransition();
-  }, [transitioning, finishTransition, state.realms]);
-
-  // Handle jump events safely.
-  useJumpTo();
 
   if (!currentRealm) {
     return (
@@ -142,7 +110,7 @@ function Game() {
       {transitioning && (
         <Transition
           label={transitioning.label}
-          onDone={finishTransitionWithJump}
+          onDone={finishTransition}
         />
       )}
       {intro && <IntroOverlay />}
@@ -152,8 +120,8 @@ function Game() {
 
 function IntroOverlay() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-700">
-      <div className="max-w-xl px-8 text-center">
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="max-w-xl px-8 text-center intro-fade">
         <div className="text-[10px] uppercase tracking-[0.5em] text-white/60">
           a wandering
         </div>
@@ -161,46 +129,9 @@ function IntroOverlay() {
           Lost Between Worlds
         </h2>
         <p className="mt-4 text-sm leading-relaxed text-white/75">
-          Click a place on the stone to walk. Click a doorway, a telescope, a tree of stars — anything that glows — to cross into another universe.
-          Find three home echoes. Draw your own map back.
+          Click a place on the stone to walk. Click a doorway, telescope, tree of stars — anything that glows — to cross into another universe. Find three home echoes. Draw your own map back.
         </p>
       </div>
     </div>
   );
-}
-
-function useJumpTo() {
-  useEffect(() => {
-    function onJump(e: Event) {
-      const detail = (e as CustomEvent<{ realmId: string }>).detail;
-      if (!detail) return;
-      // Directly mutate localStorage-backed state via a small trick: dispatch a storage event.
-      // The cleanest path is to call a hook method — but we're outside the hook here.
-      // For MVP, force a hash change so React reads updated state on next render is unnecessary;
-      // Instead we mutate storage in place and reload the game state via a full re-render trigger.
-      try {
-        const raw = window.localStorage.getItem("lost_between_worlds:adventure:v1");
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        parsed.currentRealmId = detail.realmId;
-        const dest = parsed.realms?.[detail.realmId];
-        if (dest) {
-          parsed.alienX = dest.landingX ?? 0.5;
-          parsed.alienY = dest.landingY ?? 0.72;
-          if (!parsed.visitedRealmIds.includes(detail.realmId)) {
-            parsed.visitedRealmIds.push(detail.realmId);
-          }
-          window.localStorage.setItem(
-            "lost_between_worlds:adventure:v1",
-            JSON.stringify(parsed),
-          );
-          window.location.reload();
-        }
-      } catch {
-        // ignore
-      }
-    }
-    window.addEventListener("lbw:jump-to", onJump);
-    return () => window.removeEventListener("lbw:jump-to", onJump);
-  }, []);
 }
