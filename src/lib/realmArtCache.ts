@@ -235,20 +235,34 @@ export function ensureRealmArt(
       pump();
     };
 
-    readIDB(seed)
-      .then((disk) => {
-        if (disk) {
-          artCache.set(seed, disk);
-          notifyFrameListeners(seed, disk, true);
-          resolve(disk);
-          inflight.delete(seed);
-          frameListeners.delete(seed);
-          return;
-        }
-        startNetworkJob();
-      })
-      .catch(startNetworkJob);
+    (async () => {
+      // 1. Persistent per-device cache.
+      const disk = await readIDB(seed).catch(() => null);
+      if (disk) {
+        artCache.set(seed, disk);
+        notifyFrameListeners(seed, disk, true);
+        resolve(disk);
+        inflight.delete(seed);
+        frameListeners.delete(seed);
+        return;
+      }
+      // 2. Shared server-side library (populated by whoever painted this seed first).
+      const shared = await fetchSharedArt(seed).catch(() => null);
+      if (shared) {
+        artCache.set(seed, shared);
+        writeLS(seed, shared);
+        void writeIDB(seed, shared);
+        notifyFrameListeners(seed, shared, true);
+        resolve(shared);
+        inflight.delete(seed);
+        frameListeners.delete(seed);
+        return;
+      }
+      // 3. Paint from scratch.
+      startNetworkJob();
+    })();
   });
+
 
   inflight.set(seed, task);
   return task;
