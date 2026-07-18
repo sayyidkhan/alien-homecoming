@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdventureState } from "@/game/types";
+
+type ViewMode = "2d" | "3d";
 
 export function Minimap({
   state,
@@ -9,12 +11,71 @@ export function Minimap({
   onJump: (realmId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<ViewMode>("2d");
+  const [yaw, setYaw] = useState(0);
+  const rafRef = useRef<number | null>(null);
 
   const layout = useMemo(() => positionNodes(state), [state]);
   const size = expanded ? 520 : 240;
   const svgSize = 400;
 
-  // Build orbit ring radii from unique depths.
+  // Auto-rotate in 3D
+  useEffect(() => {
+    if (mode !== "3d") return;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setYaw((y) => (y + dt * 0.25) % (Math.PI * 2));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [mode]);
+
+  // Depth (BFS) for vertical lift in 3D
+  const depthMap = useMemo(() => computeDepths(state), [state]);
+
+  // Project each node to screen coords
+  const projected = useMemo(() => {
+    const out: Record<
+      string,
+      { x: number; y: number; scale: number; z: number }
+    > = {};
+    const tilt = mode === "3d" ? 0.95 : 0; // radians, ~55°
+    const cosT = Math.cos(tilt);
+    const sinT = Math.sin(tilt);
+    const cosY = Math.cos(yaw);
+    const sinY = Math.sin(yaw);
+    const cx = 200;
+    const cy = 200;
+    for (const [id, p] of Object.entries(layout)) {
+      // world coords centered
+      const wx = p.x - cx;
+      const wz = p.y - cy;
+      const depth = depthMap[id] ?? 0;
+      const wy = mode === "3d" ? -depth * 22 : 0; // lift outer nodes up
+      // yaw around Y
+      const rx = wx * cosY + wz * sinY;
+      const rz = -wx * sinY + wz * cosY;
+      // tilt around X
+      const ry = wy * cosT - rz * sinT;
+      const rzz = wy * sinT + rz * cosT;
+      // simple perspective
+      const persp = 460 / (460 + rzz);
+      out[id] = {
+        x: cx + rx * persp,
+        y: cy + ry * persp,
+        scale: persp,
+        z: rzz,
+      };
+    }
+    return out;
+  }, [layout, mode, yaw, depthMap]);
+
+  // Orbit rings — flat circle in 2D, tilted ellipses in 3D
   const orbitRadii = useMemo(() => {
     const set = new Set<number>();
     for (const p of Object.values(layout)) {
@@ -23,6 +84,17 @@ export function Minimap({
     }
     return [...set].sort((a, b) => a - b);
   }, [layout]);
+
+  const ringTiltY = mode === "3d" ? Math.cos(0.95) : 1; // squash factor
+
+  // Sort nodes back-to-front for painter's algorithm
+  const drawOrder = useMemo(() => {
+    return Object.values(state.realms).slice().sort((a, b) => {
+      const za = projected[a.id]?.z ?? 0;
+      const zb = projected[b.id]?.z ?? 0;
+      return zb - za;
+    });
+  }, [state.realms, projected]);
 
   return (
     <div
@@ -34,13 +106,39 @@ export function Minimap({
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
           star chart
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
-        >
-          {expanded ? "shrink" : "expand"}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
+            <button
+              type="button"
+              onClick={() => setMode("2d")}
+              className={`px-2 py-0.5 transition-colors ${
+                mode === "2d"
+                  ? "bg-white/90 text-black"
+                  : "text-white/70 hover:text-white"
+              }`}
+            >
+              2d
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("3d")}
+              className={`px-2 py-0.5 transition-colors ${
+                mode === "3d"
+                  ? "bg-white/90 text-black"
+                  : "text-white/70 hover:text-white"
+              }`}
+            >
+              3d
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
+          >
+            {expanded ? "shrink" : "expand"}
+          </button>
+        </div>
       </div>
       <svg
         viewBox={`0 0 ${svgSize} ${svgSize}`}
@@ -62,15 +160,22 @@ export function Minimap({
         </defs>
 
         {/* galactic core glow */}
-        <circle cx={200} cy={200} r={90} fill="url(#mm-core)" />
+        <ellipse
+          cx={200}
+          cy={200}
+          rx={90}
+          ry={90 * ringTiltY}
+          fill="url(#mm-core)"
+        />
 
-        {/* orbital rings */}
+        {/* orbital rings — tilted ellipses in 3D */}
         {orbitRadii.map((r) => (
-          <circle
+          <ellipse
             key={r}
             cx={200}
             cy={200}
-            r={r}
+            rx={r}
+            ry={r * ringTiltY}
             fill="none"
             stroke="rgba(255,255,255,0.08)"
             strokeWidth={0.6}
@@ -80,8 +185,8 @@ export function Minimap({
 
         {/* connections */}
         {state.connections.map((c, i) => {
-          const a = layout[c.fromRealmId];
-          const b = layout[c.toRealmId];
+          const a = projected[c.fromRealmId];
+          const b = projected[c.toRealmId];
           if (!a || !b) return null;
           return (
             <line
@@ -97,9 +202,41 @@ export function Minimap({
           );
         })}
 
-        {/* nodes */}
-        {Object.values(state.realms).map((r, idx) => {
-          const pos = layout[r.id];
+        {/* 3D drop-lines from node down to base plane */}
+        {mode === "3d" &&
+          drawOrder.map((r) => {
+            const p = projected[r.id];
+            if (!p) return null;
+            // ground = same node without vertical lift
+            const cx = 200;
+            const wx = layout[r.id].x - cx;
+            const wz = layout[r.id].y - cx;
+            const cosY = Math.cos(yaw);
+            const sinY = Math.sin(yaw);
+            const rx = wx * cosY + wz * sinY;
+            const rz = -wx * sinY + wz * cosY;
+            const sinT = Math.sin(0.95);
+            const cosT = Math.cos(0.95);
+            const ry = -rz * sinT;
+            const rzz = rz * cosT;
+            const persp = 460 / (460 + rzz);
+            return (
+              <line
+                key={`drop-${r.id}`}
+                x1={p.x}
+                y1={p.y}
+                x2={cx + rx * persp}
+                y2={cx + ry * persp}
+                stroke="rgba(255,255,255,0.12)"
+                strokeWidth={0.5}
+                strokeDasharray="1 2"
+              />
+            );
+          })}
+
+        {/* nodes — painter's order */}
+        {drawOrder.map((r, idx) => {
+          const pos = projected[r.id];
           if (!pos) return null;
           const isCurrent = r.id === state.currentRealmId;
           const hasEcho = r.discoveries.some(
@@ -119,20 +256,20 @@ export function Minimap({
                   ? "#ffd9a8"
                   : "#e7a8c9";
 
-          // Alternate label above/below to avoid overlap on linear chains.
           const labelBelow = idx % 2 === 0;
           const labelY = labelBelow ? 20 : -14;
           const title = truncate(r.title, expanded ? 22 : 14);
           const labelW = Math.max(38, title.length * 5.2);
+          const s = pos.scale;
 
           return (
             <g
               key={r.id}
-              transform={`translate(${pos.x}, ${pos.y})`}
+              transform={`translate(${pos.x}, ${pos.y}) scale(${s})`}
               className="cursor-pointer minimap-node"
               onClick={() => onJump(r.id)}
+              opacity={0.4 + 0.6 * s}
             >
-              {/* soft halo */}
               <circle r={11} fill={fill} opacity={0.18} filter="url(#mm-glow)" />
               {isCurrent && (
                 <circle
@@ -152,7 +289,6 @@ export function Minimap({
               {hasUnfound && (
                 <circle r={2} cx={5} cy={-5} fill="#fff" opacity={0.95} />
               )}
-              {/* label with pill background so overlaps are readable */}
               <g transform={`translate(0, ${labelY})`}>
                 <rect
                   x={-labelW / 2}
@@ -203,6 +339,31 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
+function computeDepths(state: AdventureState): Record<string, number> {
+  const depths: Record<string, number> = {};
+  const adjacency: Record<string, string[]> = {};
+  for (const c of state.connections) {
+    (adjacency[c.fromRealmId] ??= []).push(c.toRealmId);
+    (adjacency[c.toRealmId] ??= []).push(c.fromRealmId);
+  }
+  const start = state.homeRealmId;
+  depths[start] = 0;
+  const queue: string[] = [start];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const n of adjacency[id] ?? []) {
+      if (depths[n] == null) {
+        depths[n] = depths[id] + 1;
+        queue.push(n);
+      }
+    }
+  }
+  for (const id of Object.keys(state.realms)) {
+    if (depths[id] == null) depths[id] = 0;
+  }
+  return depths;
+}
+
 function positionNodes(
   state: AdventureState,
 ): Record<string, { x: number; y: number }> {
@@ -224,8 +385,6 @@ function positionNodes(
     angleEnd: number;
   }> = [{ id: startId, depth: 0, angleStart: 0, angleEnd: Math.PI * 2 }];
 
-  // Golden-angle jitter so single-child chains fan into a spiral instead
-  // of collapsing to a straight line where labels overlap.
   const GOLDEN = 2.399963;
 
   while (queue.length) {
