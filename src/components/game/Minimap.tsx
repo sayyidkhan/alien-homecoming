@@ -183,7 +183,7 @@ export function Minimap({
       style={fullscreen ? undefined : { width: size, height: size }}
     >
       <div className="minimap-cosmos" aria-hidden />
-      <div className="relative z-10 flex items-center justify-between px-3 pt-2">
+      <div className="relative z-30 flex items-center justify-between px-3 pt-2">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
           star chart
         </div>
