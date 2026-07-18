@@ -288,11 +288,32 @@ export function useAdventure() {
     [state.currentRealmId],
   );
 
+  const jumpToRealm = useCallback((realmId: string) => {
+    setState((s) => {
+      const dest = s.realms[realmId];
+      if (!dest) return s;
+      return {
+        ...s,
+        currentRealmId: dest.id,
+        alienX: dest.landingX,
+        alienY: dest.landingY,
+        visitedRealmIds: s.visitedRealmIds.includes(dest.id)
+          ? s.visitedRealmIds
+          : [...s.visitedRealmIds, dest.id],
+      };
+    });
+  }, []);
+
   const finishTransition = useCallback(() => {
     if (!transitioning) return;
-    enterPortal(transitioning.portalId);
+    const pid = transitioning.portalId;
+    if (pid.startsWith("__jump__")) {
+      jumpToRealm(pid.replace("__jump__", ""));
+    } else {
+      enterPortal(pid);
+    }
     setTransitioning(null);
-  }, [transitioning, enterPortal]);
+  }, [transitioning, enterPortal, jumpToRealm]);
 
   const resetAdventure = useCallback(() => {
     clearAdventure();
