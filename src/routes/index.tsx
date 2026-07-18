@@ -29,6 +29,22 @@ export const Route = createFileRoute("/")({
 });
 
 function Game() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black text-white/60">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-[0.5em] text-white/40">a wandering</div>
+          <div className="mt-2 font-serif text-3xl text-white/85">Lost Between Worlds</div>
+        </div>
+      </div>
+    );
+  }
+  return <GameInner />;
+}
+
+function GameInner() {
   const {
     state,
     currentRealm,
