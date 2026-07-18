@@ -378,14 +378,14 @@ export function Minimap({
           );
         })}
       </svg>
-      <div className="relative z-10 flex flex-wrap gap-x-3 gap-y-1 px-3 pb-2 text-[9px] uppercase tracking-widest text-white/60">
-        <span><Dot color="#8ab7ff" /> start</span>
-        <span><Dot color="#e7a8c9" /> star</span>
-        <span><Dot color="#ffbf7a" /> echo</span>
-        <span><Dot color="#c894ff" ring /> hole</span>
-        <span><Dot color="#ffd76a" /> home</span>
+      <div className="relative z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-[11px] uppercase tracking-[0.18em] text-white/75">
+        <span className="flex items-center gap-1.5"><Dot color="#8ab7ff" size={10} /> start</span>
+        <span className="flex items-center gap-1.5"><Dot color="#e7a8c9" size={10} /> star</span>
+        <span className="flex items-center gap-1.5"><Dot color="#ffbf7a" size={10} /> echo</span>
+        <span className="flex items-center gap-1.5"><Dot color="#c894ff" ring size={10} /> hole</span>
+        <span className="flex items-center gap-1.5"><Dot color="#ffd76a" size={10} /> home</span>
         {mode === "3d" && (
-          <span className="opacity-60">· drag to rotate</span>
+          <span className="opacity-60 normal-case tracking-normal">· drag to rotate</span>
         )}
       </div>
     </div>
@@ -398,74 +398,120 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
     case "sun-home":
       return (
         <>
-          <circle r={14} fill="url(#mm-sun-home)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle
+            r={14}
+            fill="url(#mm-sun-home)"
+            filter="url(#mm-glow)"
+            className="sun-halo"
+          />
           <circle r={6} fill="#fffbe6" />
-          {/* corona rays */}
-          {Array.from({ length: 8 }).map((_, i) => {
-            const a = (i / 8) * Math.PI * 2 + jitter;
-            return (
-              <line
-                key={i}
-                x1={Math.cos(a) * 7}
-                y1={Math.sin(a) * 7}
-                x2={Math.cos(a) * 12}
-                y2={Math.sin(a) * 12}
-                stroke="#ffe08a"
-                strokeWidth={0.7}
-                opacity={0.75}
-              />
-            );
-          })}
+          {/* corona rays — slowly drift */}
+          <g className="sun-rays">
+            {Array.from({ length: 8 }).map((_, i) => {
+              const a = (i / 8) * Math.PI * 2 + jitter;
+              return (
+                <line
+                  key={i}
+                  x1={Math.cos(a) * 7}
+                  y1={Math.sin(a) * 7}
+                  x2={Math.cos(a) * 12}
+                  y2={Math.sin(a) * 12}
+                  stroke="#ffe08a"
+                  strokeWidth={0.7}
+                  opacity={0.75}
+                />
+              );
+            })}
+          </g>
         </>
       );
     case "sun-start":
       return (
         <>
-          <circle r={12} fill="url(#mm-sun-start)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle
+            r={12}
+            fill="url(#mm-sun-start)"
+            filter="url(#mm-glow)"
+            className="sun-halo-soft"
+          />
           <circle r={5.5} fill="#ecf5ff" />
-          <circle r={5.5} fill="none" stroke="#a8c5ff" strokeWidth={0.8} opacity={0.9} />
+          <circle
+            r={5.5}
+            fill="none"
+            stroke="#a8c5ff"
+            strokeWidth={0.8}
+            opacity={0.9}
+          />
+          {/* faint rays drifting opposite direction */}
+          <g className="sun-rays-reverse">
+            {Array.from({ length: 6 }).map((_, i) => {
+              const a = (i / 6) * Math.PI * 2 + jitter;
+              return (
+                <line
+                  key={i}
+                  x1={Math.cos(a) * 6.5}
+                  y1={Math.sin(a) * 6.5}
+                  x2={Math.cos(a) * 10.5}
+                  y2={Math.sin(a) * 10.5}
+                  stroke="#bcd4ff"
+                  strokeWidth={0.5}
+                  opacity={0.55}
+                />
+              );
+            })}
+          </g>
         </>
       );
     case "star-echo":
       return (
         <>
-          <circle r={11} fill="url(#mm-star-echo)" opacity={0.55} filter="url(#mm-glow)" />
+          <circle
+            r={11}
+            fill="url(#mm-star-echo)"
+            filter="url(#mm-glow)"
+            className="sun-halo-soft"
+          />
           <circle r={4.5} fill="#fff2d6" />
-          {/* four-point twinkle */}
           <path
             d="M0,-9 L1,-1 L9,0 L1,1 L0,9 L-1,1 L-9,0 L-1,-1 Z"
             fill="#ffdfa8"
-            opacity={0.85}
+            className="star-twinkle"
           />
         </>
       );
     case "star":
       return (
         <>
-          <circle r={10} fill="url(#mm-star)" opacity={0.5} filter="url(#mm-glow)" />
+          <circle
+            r={10}
+            fill="url(#mm-star)"
+            filter="url(#mm-glow)"
+            className="sun-halo-soft"
+          />
           <circle r={4} fill="#ffe4f0" />
           <path
             d="M0,-6 L0.7,-0.7 L6,0 L0.7,0.7 L0,6 L-0.7,0.7 L-6,0 L-0.7,-0.7 Z"
             fill="#f4c9de"
-            opacity={0.9}
+            className="star-twinkle"
           />
         </>
       );
     case "blackhole":
       return (
         <>
-          {/* accretion disk (ellipse for depth) */}
-          <ellipse rx={13} ry={4.5} fill="none" stroke="#c894ff" strokeWidth={1.2} opacity={0.85} />
-          <ellipse rx={13} ry={4.5} fill="none" stroke="#f5d6ff" strokeWidth={0.4} opacity={0.9} />
-          {/* halo */}
+          {/* accretion disk spins slowly */}
+          <g className="blackhole-disk">
+            <ellipse rx={13} ry={4.5} fill="none" stroke="#c894ff" strokeWidth={1.2} opacity={0.85} />
+            <ellipse rx={13} ry={4.5} fill="none" stroke="#f5d6ff" strokeWidth={0.4} opacity={0.9} />
+          </g>
           <circle r={11} fill="url(#mm-blackhole)" opacity={0.9} />
-          {/* event horizon */}
           <circle r={4.5} fill="#000" />
           <circle r={4.5} fill="none" stroke="#c894ff" strokeWidth={0.5} opacity={0.9} />
         </>
       );
   }
 }
+
 
 function Dot({ color, ring }: { color: string; ring?: boolean }) {
   if (ring) {
