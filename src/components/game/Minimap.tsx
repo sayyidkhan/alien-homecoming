@@ -201,6 +201,32 @@ export function Minimap({
               3d
             </button>
           </div>
+          <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
+              aria-label="zoom out"
+              className="px-2 py-0.5 hover:bg-white/10 hover:text-white"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+              aria-label="zoom in"
+              className="px-2 py-0.5 border-l border-white/15 hover:bg-white/10 hover:text-white"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              aria-label="recenter on start"
+              className="px-2 py-0.5 border-l border-white/15 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
+            >
+              home
+            </button>
+          </div>
           {!fullscreen && (
             <button
               type="button"
@@ -222,12 +248,13 @@ export function Minimap({
       </div>
 
       <svg
-        viewBox={`0 0 ${svgSize} ${svgSize}`}
-        className="relative z-10 w-full flex-1"
-        style={{ cursor: mode === "3d" ? "grab" : "default" }}
+        viewBox={`${viewX} ${viewY} ${viewSize} ${viewSize}`}
+        className="relative z-10 w-full flex-1 touch-none"
+        style={{ cursor: panRef.current ? "grabbing" : mode === "3d" || zoom > 1.01 ? "grab" : "default" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+
         onPointerLeave={onPointerUp}
       >
         <defs>
