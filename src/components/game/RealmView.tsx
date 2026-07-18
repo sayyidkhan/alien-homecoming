@@ -160,14 +160,10 @@ export function RealmView({
       <div className="pointer-events-none absolute inset-0 realm-particles" />
 
       {/* Loading screen — shown until first pixels arrive */}
-      {!art && <RealmLoading title={realm.title} />}
+      {!art && <RealmLoading title={realm.title} seed={realm.seed} />}
 
       {/* Painting-in indicator (after first partial pixels) */}
-      {art && !isFinal && (
-        <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-full bg-black/40 backdrop-blur px-3 py-1 text-[10px] tracking-[0.25em] uppercase text-white/80 toast-in">
-          Realm painting…
-        </div>
-      )}
+      {art && !isFinal && <PaintingProgress seed={realm.seed} />}
 
       {/* Discoveries */}
       {realm.discoveries.map((d) =>
