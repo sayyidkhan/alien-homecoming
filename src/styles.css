@@ -174,21 +174,33 @@
   transform: translate(-50%, 14px);
 }
 
-/* Back-portal guide: always visible, tinted, gently pulsing */
+/* Back-portal guide: pulses in and out so the player notices it gradually */
+@keyframes guideCycle {
+  0%, 100% { opacity: 0; }
+  10% { opacity: 1; }
+  40% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes backArrowBob {
+  0%, 100% { transform: translate(-50%, -6px); opacity: 0.85; }
+  50%      { transform: translate(-50%, -14px); opacity: 1; }
+}
 .portal-back .portal-glow {
-  opacity: 0.85;
+  opacity: 0;
   background: radial-gradient(circle at 50% 55%, rgba(140,220,255,0.55), rgba(140,220,255,0) 65%);
-  animation: portalPulse 2.6s ease-in-out infinite;
+  animation: guideCycle 12s ease-in-out infinite;
 }
 .portal-back {
   border-color: rgba(140,220,255,0.45);
 }
 .portal-back .portal-label {
-  opacity: 1;
+  opacity: 0;
   transform: translate(-50%, 14px);
   color: rgba(220,245,255,0.95);
   border-color: rgba(140,220,255,0.45);
   background: rgba(8,20,32,0.65);
+  animation: guideCycle 12s ease-in-out infinite;
+  animation-delay: 0.5s;
 }
 .portal-back-arrow {
   position: absolute;
@@ -200,11 +212,24 @@
   line-height: 1;
   color: rgba(180,235,255,0.95);
   text-shadow: 0 0 12px rgba(140,220,255,0.8);
-  animation: backArrowBob 1.6s ease-in-out infinite;
+  opacity: 0;
+  animation: guideCycle 12s ease-in-out infinite, backArrowBob 1.6s ease-in-out infinite;
+  animation-delay: 0.25s;
 }
-@keyframes backArrowBob {
-  0%, 100% { transform: translate(-50%, -6px); opacity: 0.85; }
-  50%      { transform: translate(-50%, -14px); opacity: 1; }
+/* Hover / focus freezes the guide on so it stays readable while interacting */
+.portal-hit.portal-back:hover .portal-glow,
+.portal-hit.portal-back:focus-visible .portal-glow,
+.portal-hit.portal-back:hover .portal-label,
+.portal-hit.portal-back:focus-visible .portal-label,
+.portal-hit.portal-back:hover .portal-back-arrow,
+.portal-hit.portal-back:focus-visible .portal-back-arrow {
+  opacity: 1;
+  animation: none;
+}
+.back-guide-hint {
+  opacity: 0;
+  animation: guideCycle 12s ease-in-out infinite;
+  animation-delay: 2s;
 }
 
 .clue-sparkle {
