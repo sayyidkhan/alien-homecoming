@@ -97,7 +97,7 @@ async function readIDB(seed: string): Promise<string | null> {
   try {
     const db = await openArtDB();
     if (!db) return null;
-    return await new Promise((resolve) => {
+    return await new Promise<string | null>((resolve) => {
       const req = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(seed);
       req.onsuccess = () => resolve(typeof req.result === "string" ? req.result : null);
       req.onerror = () => resolve(null);
