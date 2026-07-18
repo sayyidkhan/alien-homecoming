@@ -134,8 +134,8 @@ export function Minimap({
 
   return (
     <div
-      className={`minimap ${expanded ? "minimap-expanded" : ""}`}
-      style={{ width: size, height: size }}
+      className={`minimap ${expanded ? "minimap-expanded" : ""} ${fullscreen ? "minimap-fullscreen" : ""}`}
+      style={fullscreen ? undefined : { width: size, height: size }}
     >
       <div className="minimap-cosmos" aria-hidden />
       <div className="relative z-10 flex items-center justify-between px-3 pt-2">
@@ -167,15 +167,26 @@ export function Minimap({
               3d
             </button>
           </div>
+          {!fullscreen && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
+            >
+              {expanded ? "shrink" : "expand"}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setFullscreen((v) => !v)}
+            aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
             className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
           >
-            {expanded ? "shrink" : "expand"}
+            {fullscreen ? "close" : "full"}
           </button>
         </div>
       </div>
+
       <svg
         viewBox={`0 0 ${svgSize} ${svgSize}`}
         className="relative z-10 w-full flex-1"
