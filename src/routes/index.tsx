@@ -129,6 +129,7 @@ function GameInner() {
       />
       <DiscoveryToast message={toast} />
       <Minimap state={state} onJump={handleJump} />
+      <PrewarmHUD currentSeed={currentRealm.seed} />
       <button
         type="button"
         onClick={() => setAtlasOpen(true)}
