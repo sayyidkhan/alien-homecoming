@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdventureState, RealmNode } from "@/game/types";
 
 type ViewMode = "2d" | "3d";
@@ -38,8 +38,19 @@ export function Minimap({
   const [yaw, setYaw] = useState(-0.4);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [menuOpen, setMenuOpen] = useState(false);
   const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
 
 
   const layout = useMemo(() => positionNodes(state), [state]);
@@ -176,74 +187,51 @@ export function Minimap({
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
           star chart
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
-            <button
-              type="button"
-              onClick={() => setMode("2d")}
-              className={`px-2 py-0.5 transition-colors ${
-                mode === "2d"
-                  ? "bg-white/90 text-black"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              2d
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("3d")}
-              className={`px-2 py-0.5 transition-colors ${
-                mode === "3d"
-                  ? "bg-white/90 text-black"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              3d
-            </button>
-          </div>
-          <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
-              aria-label="zoom out"
-              className="px-2 py-0.5 hover:bg-white/10 hover:text-white"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
-              aria-label="zoom in"
-              className="px-2 py-0.5 border-l border-white/15 hover:bg-white/10 hover:text-white"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={resetView}
-              aria-label="recenter on start"
-              className="px-2 py-0.5 border-l border-white/15 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
-            >
-              home
-            </button>
-          </div>
-          {!fullscreen && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
-            >
-              {expanded ? "shrink" : "expand"}
-            </button>
+        <div className="flex items-center gap-2" ref={menuRef}>
+
+          {(fullscreen || expanded) ? (
+            <ControlBar
+              mode={mode}
+              setMode={setMode}
+              setZoom={setZoom}
+              resetView={resetView}
+              expanded={expanded}
+              fullscreen={fullscreen}
+              setExpanded={setExpanded}
+              setFullscreen={setFullscreen}
+            />
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="chart controls"
+                aria-expanded={menuOpen}
+                className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+              >
+                ⋯
+              </button>
+              {menuOpen && (
+                <div
+                  className="absolute right-0 top-full z-20 mt-1 flex flex-col gap-2 rounded-lg border border-white/15 bg-black/90 p-2 shadow-xl backdrop-blur"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ControlBar
+                    mode={mode}
+                    setMode={setMode}
+                    setZoom={setZoom}
+                    resetView={resetView}
+                    expanded={expanded}
+                    fullscreen={fullscreen}
+                    setExpanded={(v) => { setExpanded(v); setMenuOpen(false); }}
+                    setFullscreen={(v) => { setFullscreen(v); setMenuOpen(false); }}
+                    stacked
+                  />
+                </div>
+              )}
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setFullscreen((v) => !v)}
-            aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
-            className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
-          >
-            {fullscreen ? "close" : "full"}
-          </button>
         </div>
       </div>
 
@@ -575,6 +563,100 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
         </>
       );
   }
+}
+
+type ViewModeType = ViewMode;
+function ControlBar({
+  mode,
+  setMode,
+  setZoom,
+  resetView,
+  expanded,
+  fullscreen,
+  setExpanded,
+  setFullscreen,
+  stacked = false,
+}: {
+  mode: ViewModeType;
+  setMode: (m: ViewModeType) => void;
+  setZoom: (updater: (z: number) => number) => void;
+  resetView: () => void;
+  expanded: boolean;
+  fullscreen: boolean;
+  setExpanded: (v: boolean) => void;
+  setFullscreen: (v: boolean) => void;
+  stacked?: boolean;
+}) {
+  const wrap = stacked
+    ? "flex flex-col items-stretch gap-2"
+    : "flex items-center gap-2";
+  return (
+    <div className={wrap}>
+      <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
+        <button
+          type="button"
+          onClick={() => setMode("2d")}
+          className={`flex-1 px-2 py-0.5 transition-colors ${
+            mode === "2d" ? "bg-white/90 text-black" : "text-white/70 hover:text-white"
+          }`}
+        >
+          2d
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("3d")}
+          className={`flex-1 px-2 py-0.5 transition-colors ${
+            mode === "3d" ? "bg-white/90 text-black" : "text-white/70 hover:text-white"
+          }`}
+        >
+          3d
+        </button>
+      </div>
+      <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
+          aria-label="zoom out"
+          className="flex-1 px-2 py-0.5 hover:bg-white/10 hover:text-white"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+          aria-label="zoom in"
+          className="flex-1 border-l border-white/15 px-2 py-0.5 hover:bg-white/10 hover:text-white"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          aria-label="recenter on start"
+          className="flex-1 border-l border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
+        >
+          home
+        </button>
+      </div>
+      {!fullscreen && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+        >
+          {expanded ? "shrink" : "expand"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setFullscreen(!fullscreen)}
+        aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
+        className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+      >
+        {fullscreen ? "close" : "full"}
+      </button>
+    </div>
+  );
 }
 
 
