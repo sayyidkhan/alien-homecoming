@@ -4,28 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
- */
-
 @theme inline {
+  --font-serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -45,100 +30,196 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-ring-offset-background: var(--background);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
-}
-
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --radius: 0.75rem;
+  --background: oklch(0.14 0.05 290);
+  --foreground: oklch(0.97 0.02 90);
+  --card: oklch(0.18 0.05 285);
+  --card-foreground: oklch(0.97 0.02 90);
+  --popover: oklch(0.18 0.05 285);
+  --popover-foreground: oklch(0.97 0.02 90);
+  --primary: oklch(0.85 0.12 80);
+  --primary-foreground: oklch(0.18 0.05 285);
+  --secondary: oklch(0.28 0.07 285);
+  --secondary-foreground: oklch(0.97 0.02 90);
+  --muted: oklch(0.24 0.05 285);
+  --muted-foreground: oklch(0.72 0.03 280);
+  --accent: oklch(0.75 0.15 340);
+  --accent-foreground: oklch(0.18 0.05 285);
+  --destructive: oklch(0.63 0.24 27);
+  --destructive-foreground: oklch(0.97 0.02 90);
+  --border: oklch(0.35 0.05 285);
+  --input: oklch(0.28 0.05 285);
+  --ring: oklch(0.75 0.15 340);
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
+  html, body, #root { height: 100%; }
   body {
-    background-color: var(--color-background);
+    background: #05030f;
     color: var(--color-foreground);
+    font-family: "Inter", system-ui, sans-serif;
+    overflow: hidden;
   }
+  h1, h2, .font-serif {
+    font-family: var(--font-serif);
+    letter-spacing: 0.01em;
+  }
+  * { border-color: var(--color-border); }
+}
+
+/* ---------- Game visuals ---------- */
+
+.bg-gradient-radial {
+  background: radial-gradient(circle at 50% 55%, rgba(255,240,200,0.85), rgba(200,150,255,0.4) 30%, rgba(20,10,40,0.95) 70%, #000 100%);
+}
+
+@keyframes portalPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+@keyframes alienBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes alienCelebrate {
+  0% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(-10px) rotate(-6deg); }
+  50% { transform: translateY(-2px) rotate(6deg); }
+  75% { transform: translateY(-8px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+@keyframes warpIn {
+  0% { opacity: 0; transform: scale(0.6); filter: blur(24px); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1.4); filter: blur(0); }
+}
+@keyframes textIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@keyframes toastIn {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes driftParticles {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 400px -200px, -300px 300px; }
+}
+@keyframes currentRing {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.alien-bob { animation: alienBob 2.6s ease-in-out infinite; }
+.alien-celebrate { animation: alienCelebrate 1.2s ease-in-out; }
+
+.portal-hit {
+  border: 1px solid transparent;
+  background: transparent;
+  transition: border-color 200ms ease;
+}
+.portal-hit:hover, .portal-hit:focus-visible {
+  border-color: rgba(255,240,200,0.35);
+}
+.portal-glow {
+  position: absolute;
+  inset: -12px;
+  background: radial-gradient(circle at 50% 55%, rgba(255,240,200,0.55), rgba(255,240,200,0) 65%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+  border-radius: 24px;
+}
+.portal-hit:hover .portal-glow,
+.portal-hit:focus-visible .portal-glow {
+  opacity: 1;
+  animation: portalPulse 2.4s ease-in-out infinite;
+}
+.portal-locked .portal-glow {
+  background: radial-gradient(circle at 50% 55%, rgba(180,120,200,0.35), transparent 65%);
+}
+.portal-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 8px);
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 220ms ease, transform 220ms ease;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.portal-hit:hover .portal-label,
+.portal-hit:focus-visible .portal-label {
+  opacity: 1;
+  transform: translate(-50%, 14px);
+}
+
+.clue-sparkle {
+  background: radial-gradient(circle, rgba(255,240,200,0.95) 0%, rgba(255,240,200,0.2) 55%, transparent 75%);
+  animation: sparkleTwinkle 1.8s ease-in-out infinite;
+  box-shadow: 0 0 18px rgba(255,240,200,0.5);
+}
+
+.realm-particles {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.6), transparent 55%),
+    radial-gradient(1px 1px at 120px 200px, rgba(255,220,180,0.5), transparent 55%);
+  background-size: 400px 400px, 300px 300px;
+  animation: driftParticles 30s linear infinite;
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+
+.transition-warp {
+  animation: warpIn 1.3s cubic-bezier(0.6, 0.05, 0.4, 1) forwards;
+}
+.transition-text {
+  animation: textIn 0.6s 0.2s ease forwards;
+  opacity: 0;
+}
+.toast-in { animation: toastIn 0.4s ease forwards; }
+
+.minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(10,6,24,0.55);
+  backdrop-filter: blur(10px);
+  transition: width 300ms ease, height 300ms ease;
+  overflow: hidden;
+}
+.minimap-current { animation: currentRing 2.4s ease-in-out infinite; }
+
+/* Hide default focus outlines only when we render our own */
+button:focus { outline: none; }
+button:focus-visible { outline: 2px solid rgba(255,240,200,0.6); outline-offset: 2px; border-radius: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .alien-bob, .alien-celebrate, .clue-sparkle, .realm-particles,
+  .minimap-current, .transition-warp { animation: none !important; }
 }
