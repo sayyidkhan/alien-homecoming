@@ -5,8 +5,31 @@ const MAX_CONCURRENT = 2;
 
 const artCache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
-const queue: Array<() => void> = [];
+const queue: Array<{ seed: string; run: () => void }> = [];
 let active = 0;
+
+export type PrewarmJob = {
+  seed: string;
+  title: string;
+  status: "queued" | "painting";
+  progress: number; // 0..1 (partial frames count / expected)
+};
+
+const jobs = new Map<string, PrewarmJob>();
+const listeners = new Set<() => void>();
+
+function emit() {
+  listeners.forEach((l) => l());
+}
+
+export function subscribePrewarm(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+export function getPrewarmSnapshot(): PrewarmJob[] {
+  return Array.from(jobs.values());
+}
 
 function readLS(seed: string): string | null {
   try {
@@ -37,21 +60,17 @@ export function getCachedArt(seed: string): string | null {
 function pump() {
   while (active < MAX_CONCURRENT && queue.length > 0) {
     const next = queue.shift();
-    if (next) next();
+    if (next) next.run();
   }
 }
 
-/**
- * Ensure art exists for a seed. Returns the in-flight promise so callers can
- * subscribe to partial frames via `onFrame`. Concurrency is limited so we
- * don't fire N image jobs at once when prewarming.
- */
 export function ensureRealmArt(
   seed: string,
   prompt: string,
   onFrame?: (dataUrl: string, isFinal: boolean) => void,
   signal?: AbortSignal,
   priority: "foreground" | "background" = "foreground",
+  title: string = "Unknown realm",
 ): Promise<string> {
   const cached = getCachedArt(seed);
   if (cached) {
@@ -61,23 +80,37 @@ export function ensureRealmArt(
 
   const existing = inflight.get(seed);
   if (existing) {
-    // Subscribe latecomer if we have a way to (we don't replay frames — but
-    // they'll get the final url when it resolves).
-    if (onFrame) {
-      existing.then((url) => onFrame(url, true)).catch(() => {});
-    }
+    if (onFrame) existing.then((url) => onFrame(url, true)).catch(() => {});
     return existing;
   }
+
+  // Register the job so the HUD can show it.
+  jobs.set(seed, { seed, title, status: "queued", progress: 0 });
+  emit();
 
   const task = new Promise<string>((resolve, reject) => {
     const run = () => {
       active++;
+      const job = jobs.get(seed);
+      if (job) {
+        job.status = "painting";
+        emit();
+      }
+      let frames = 0;
       streamRealmImage(
         prompt,
         (dataUrl, final) => {
           if (final) {
             artCache.set(seed, dataUrl);
             writeLS(seed, dataUrl);
+          } else {
+            frames++;
+            const j = jobs.get(seed);
+            if (j) {
+              // Assume ~3 partial frames before final; cap at 0.9.
+              j.progress = Math.min(0.9, frames / 3);
+              emit();
+            }
           }
           onFrame?.(dataUrl, final);
         },
@@ -92,15 +125,14 @@ export function ensureRealmArt(
         .finally(() => {
           active--;
           inflight.delete(seed);
+          jobs.delete(seed);
+          emit();
           pump();
         });
     };
-    if (priority === "foreground") {
-      // Foreground jumps the queue.
-      queue.unshift(run);
-    } else {
-      queue.push(run);
-    }
+    const entry = { seed, run };
+    if (priority === "foreground") queue.unshift(entry);
+    else queue.push(entry);
     pump();
   });
 
