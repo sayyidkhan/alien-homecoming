@@ -331,6 +331,7 @@ export function useAdventure() {
       beginTransition,
       finishTransition,
       resetAdventure,
+      jumpToRealm,
       wayHomePortalId: WAY_HOME_PORTAL_ID,
     }),
     [
@@ -342,6 +343,7 @@ export function useAdventure() {
       beginTransition,
       finishTransition,
       resetAdventure,
+      jumpToRealm,
     ],
   );
 
