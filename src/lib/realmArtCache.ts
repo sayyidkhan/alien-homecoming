@@ -215,9 +215,11 @@ export function ensureRealmArt(
           artCache.set(seed, finalUrl);
           writeLS(seed, finalUrl);
           void writeIDB(seed, finalUrl);
+          void publishSharedArt(seed, finalUrl, title);
           resolve(finalUrl);
         })
         .catch((err) => reject(err))
+
         .finally(() => {
           active--;
           inflight.delete(seed);
