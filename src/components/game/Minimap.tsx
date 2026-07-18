@@ -134,6 +134,8 @@ export function Minimap({
 
   // Drag to rotate (3D) or pan (both modes with shift/middle, or when zoomed)
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    const target = e.target as Element;
+    if (target.closest?.(".minimap-node")) return; // let node clicks through
     if (e.shiftKey || e.button === 1 || (mode === "2d" && zoom > 1.01)) {
       panRef.current = { x: e.clientX, y: e.clientY, startX: pan.x, startY: pan.y };
       (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
