@@ -116,7 +116,10 @@ function GameInner() {
         onPortalActivate={handlePortalActivate}
         onDiscovery={handleDiscovery}
         disabled={!!transitioning}
+        adventureId={state.adventureId}
+        echoesCollected={state.homeEchoes.length}
       />
+
       <HUD
         realm={currentRealm}
         echoes={state.homeEchoes}
