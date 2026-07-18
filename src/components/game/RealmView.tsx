@@ -229,7 +229,15 @@ export function RealmView({
   );
 }
 
-function RealmLoading({ title }: { title: string }) {
+function RealmLoading({ title, seed }: { title: string; seed: string }) {
+  const { status, progress } = useSeedProgress(seed);
+  const pct = Math.round(progress * 100);
+  const label =
+    status === "queued"
+      ? "Queued · waiting for a painter"
+      : progress > 0
+        ? `Painting · ${pct}%`
+        : "Painting a new universe";
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#05030f]">
       <div className="loading-starfield absolute inset-0" />
@@ -242,20 +250,43 @@ function RealmLoading({ title }: { title: string }) {
         </div>
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-[0.4em] text-white/60">
-            Painting a new universe
+            {label}
           </div>
           <div className="mt-2 font-serif text-2xl text-white/95">{title}</div>
         </div>
-        <div className="flex gap-2">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="h-1.5 w-1.5 rounded-full bg-white/80"
-              style={{ animation: `pulseDot 1.2s ${i * 0.15}s infinite` }}
-            />
-          ))}
+        <div className="h-1.5 w-64 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-amber-200 transition-[width] duration-500"
+            style={{
+              width:
+                status === "queued"
+                  ? "6%"
+                  : progress > 0
+                    ? `${Math.max(8, pct)}%`
+                    : "12%",
+            }}
+          />
+        </div>
+        <div className="text-[9px] uppercase tracking-[0.3em] text-white/45">
+          first pixels usually arrive in ~5–10s
         </div>
       </div>
+    </div>
+  );
+}
+
+function PaintingProgress({ seed }: { seed: string }) {
+  const { progress } = useSeedProgress(seed);
+  const pct = Math.max(10, Math.round(progress * 100));
+  return (
+    <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 rounded-full bg-black/45 backdrop-blur px-4 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/85 toast-in">
+      <span>Painting · {pct}%</span>
+      <span className="h-1 w-24 overflow-hidden rounded-full bg-white/10">
+        <span
+          className="block h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-amber-200 transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </span>
     </div>
   );
 }
