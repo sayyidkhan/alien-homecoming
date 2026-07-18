@@ -91,21 +91,25 @@ const FAMILY_PROMPTS: Record<RealmNode["family"], string> = {
 
 export function buildRealmPrompt(realm: RealmNode): string {
   const base = FAMILY_PROMPTS[realm.family];
-  const paletteHint = `soft palette of ${realm.palette[0]}, ${realm.palette[1]}, ${realm.palette[2]} with ${realm.palette[3]} light accents`;
+  const paletteHint = `overall palette washed in ${realm.palette[0]}, ${realm.palette[1]}, ${realm.palette[2]}, with delicate ${realm.palette[3]} light glinting on edges`;
   const specialLine =
     realm.special === "false_home"
-      ? "Uncanny — almost like home but wrong."
+      ? "The central archway glows a warm familiar gold — uncanny, almost like home, but the geometry is subtly wrong."
       : realm.special === "real_home"
-        ? "A doorway of returning, warm and remembered."
+        ? "One archway at the heart of the composition radiates a warm remembered light — the doorway of returning."
         : "";
   return [
-    "Isometric floating island in a dreamy cosmic sky.",
-    "Monument Valley art direction: delicate pastel architecture, painterly, soft ambient light, distant galaxies and planets drifting in a lavender-rose starry cosmos, ultra-clean, no text, no UI, no watermark.",
-    `Landmark: ${base}.`,
-    `Title: "${realm.title}". ${specialLine}`,
+    "A breathtaking Monument Valley style illustration: a labyrinth of pale pastel floating islands and impossible architecture drifting in a deep dreamy cosmic sky.",
+    "Multiple small platforms are connected by delicate staircases, arched bridges, colonnades and thin luminous walkways that weave through the composition like a puzzle maze.",
+    "Tiny robed traveller figures stand on stairs and terraces at storybook scale, giving the architecture an enormous sense of quiet wonder.",
+    `Featured landmark on the central island: ${base}.`,
+    `Realm title (do not render as text in the image): "${realm.title}". ${specialLine}`,
+    "Background: a lavender-rose starry cosmos with soft spiral galaxies, drifting planets (a ringed Saturn-like world, a pale gas giant, small moons), scattered stardust and faint nebulae.",
     paletteHint,
-    "Wide 3:2 composition, centered island, generous negative space, cinematic and serene.",
+    "Painterly, ultra-high detail, soft cinematic ambient light, gentle rim glow, delicate shadows, serene and magical.",
+    "Wide 3:2 composition, centered maze of islands with generous negative space of cosmos around them. Absolutely no text, no letters, no UI, no watermark, no logo.",
   ]
     .filter(Boolean)
     .join(" ");
 }
+
