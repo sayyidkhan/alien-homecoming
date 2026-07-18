@@ -346,8 +346,11 @@ button:focus-visible { outline: 2px solid rgba(255,240,200,0.6); outline-offset:
 
 @media (prefers-reduced-motion: reduce) {
   .alien-bob, .alien-celebrate, .clue-sparkle, .realm-particles,
-  .minimap-current, .transition-warp { animation: none !important; }
+  .minimap-current, .transition-warp,
+  .sun-halo, .sun-halo-soft, .sun-rays, .sun-rays-reverse,
+  .star-twinkle, .blackhole-disk { animation: none !important; }
 }
+
 
 /* Realm loading screen */
 .loading-starfield {
