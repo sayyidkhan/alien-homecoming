@@ -84,7 +84,6 @@ export function RealmView({
     setArt(null);
     setIsFinal(false);
 
-    const controller = new AbortController();
     let alive = true;
     ensureRealmArt(
       realm.seed,
@@ -94,13 +93,12 @@ export function RealmView({
         setArt(dataUrl);
         setIsFinal(final);
       },
-      controller.signal,
+      undefined,
       "foreground",
     ).catch(() => {});
 
     return () => {
       alive = false;
-      controller.abort();
     };
   }, [realm.seed]);
 

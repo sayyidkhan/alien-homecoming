@@ -6,16 +6,49 @@ type ImageEventPayload =
   | { type: "image_generation.completed"; b64_json: string }
   | { type: "error"; error: { message: string } };
 
+function imageModelForAttempt(attempt: number) {
+  return attempt === 1 ? "openai/gpt-image-2" : "google/gemini-3.1-flash-lite-image";
+}
+
+function timeoutForModel(model: string) {
+  return model === "openai/gpt-image-2" ? 45_000 : 35_000;
+}
+
 export async function streamRealmImage(
   prompt: string,
   onFrame: (dataUrl: string, isFinal: boolean) => void,
   signal?: AbortSignal,
 ): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await streamRealmImageAttempt(prompt, onFrame, signal, imageModelForAttempt(attempt));
+    } catch (error) {
+      lastError = error;
+      if (signal?.aborted) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Image generation failed");
+}
+
+async function streamRealmImageAttempt(
+  prompt: string,
+  onFrame: (dataUrl: string, isFinal: boolean) => void,
+  signal: AbortSignal | undefined,
+  model: string,
+): Promise<string> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort("image-timeout"), timeoutForModel(model));
+  const abortFromParent = () => controller.abort(signal?.reason ?? "cancelled");
+  if (signal?.aborted) abortFromParent();
+  else signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  try {
   const res = await fetch("/api/generate-realm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-    signal,
+    body: JSON.stringify({ prompt, model }),
+    signal: controller.signal,
   });
   if (!res.ok || !res.body) {
     throw new Error(`Image generation failed: ${res.status}`);
@@ -58,9 +91,13 @@ export async function streamRealmImage(
   } finally {
     reader.cancel().catch(() => {});
   }
-  if (streamError) throw new Error(streamError);
-  if (!finalDataUrl) throw new Error("Stream ended without completion");
-  return finalDataUrl;
+    if (streamError) throw new Error(streamError);
+    if (!finalDataUrl) throw new Error("Stream ended without completion");
+    return finalDataUrl;
+  } finally {
+    window.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abortFromParent);
+  }
 }
 
 // ---- Prompt builder ----

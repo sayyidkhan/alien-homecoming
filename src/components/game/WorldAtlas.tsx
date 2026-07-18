@@ -1,17 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AdventureState, RealmNode } from "@/game/types";
-
-const LS_PREFIX = "realm-art-v2:";
-
-function readArt(seed: string): string | null {
-  try {
-    return typeof window !== "undefined"
-      ? localStorage.getItem(LS_PREFIX + seed)
-      : null;
-  } catch {
-    return null;
-  }
-}
+import { getCachedArtAsync } from "@/lib/realmArtCache";
 
 export function WorldAtlas({
   state,
@@ -29,11 +18,24 @@ export function WorldAtlas({
       ),
     [state.realms],
   );
+  const [artBySeed, setArtBySeed] = useState<Record<string, string>>({});
 
-  const cachedCount = useMemo(
-    () => realms.filter((r) => !!readArt(r.seed)).length,
-    [realms],
-  );
+  useEffect(() => {
+    let alive = true;
+    void Promise.all(
+      realms.map(async (r) => [r.seed, await getCachedArtAsync(r.seed)] as const),
+    ).then((entries) => {
+      if (!alive) return;
+      setArtBySeed(
+        Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry[1])),
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, [realms]);
+
+  const cachedCount = Object.keys(artBySeed).length;
 
   return (
     <div
@@ -71,6 +73,7 @@ export function WorldAtlas({
             <AtlasCard
               key={r.id}
               realm={r}
+              art={artBySeed[r.seed] ?? null}
               current={r.id === state.currentRealmId}
               onJump={() => {
                 onJump(r.id);
@@ -90,14 +93,15 @@ export function WorldAtlas({
 
 function AtlasCard({
   realm,
+  art,
   current,
   onJump,
 }: {
   realm: RealmNode;
+  art: string | null;
   current: boolean;
   onJump: () => void;
 }) {
-  const art = readArt(realm.seed);
   const foundEchoes = realm.discoveries.filter(
     (d) => d.kind === "home_echo" && d.found,
   ).length;

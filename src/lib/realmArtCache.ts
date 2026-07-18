@@ -2,6 +2,8 @@ import { streamRealmImage } from "./streamRealmImage";
 
 const LS_PREFIX = "realm-art-v2:";
 const MAX_CONCURRENT = 2;
+const DB_NAME = "lost-between-worlds-art";
+const STORE_NAME = "realm-art";
 
 const artCache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
@@ -72,7 +74,50 @@ function writeLS(seed: string, dataUrl: string) {
   try {
     localStorage.setItem(LS_PREFIX + seed, dataUrl);
   } catch {
-    /* quota */
+    /* localStorage is tiny; IndexedDB below is the durable image cache. */
+  }
+}
+
+function openArtDB(): Promise<IDBDatabase | null> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const req = window.indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+
+async function readIDB(seed: string): Promise<string | null> {
+  try {
+    const db = await openArtDB();
+    if (!db) return null;
+    return await new Promise<string | null>((resolve) => {
+      const req = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(seed);
+      req.onsuccess = () => resolve(typeof req.result === "string" ? req.result : null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function writeIDB(seed: string, dataUrl: string): Promise<void> {
+  try {
+    const db = await openArtDB();
+    if (!db) return;
+    await new Promise<void>((resolve) => {
+      const req = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(dataUrl, seed);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+    });
+  } catch {
+    /* ignore cache failures */
   }
 }
 
@@ -80,6 +125,17 @@ export function getCachedArt(seed: string): string | null {
   const mem = artCache.get(seed);
   if (mem) return mem;
   const disk = readLS(seed);
+  if (disk) {
+    artCache.set(seed, disk);
+    return disk;
+  }
+  return null;
+}
+
+export async function getCachedArtAsync(seed: string): Promise<string | null> {
+  const sync = getCachedArt(seed);
+  if (sync) return sync;
+  const disk = await readIDB(seed);
   if (disk) {
     artCache.set(seed, disk);
     return disk;
@@ -115,18 +171,19 @@ export function ensureRealmArt(
     return existing;
   }
 
-  // Register the job so the HUD can show it.
-  jobs.set(seed, { seed, title, status: "queued", progress: 0, createdAt: Date.now() });
   if (onFrame) addFrameListener(seed, onFrame);
-  emit();
 
   const task = new Promise<string>((resolve, reject) => {
-    const run = () => {
+    const startNetworkJob = () => {
+      // Register the job only after the persistent cache has been checked.
+      jobs.set(seed, { seed, title, status: "queued", progress: 0, createdAt: Date.now() });
+      emit();
+
+      const run = () => {
       active++;
       const job = jobs.get(seed);
       if (job) {
-        job.status = "painting";
-        job.startedAt = Date.now();
+        jobs.set(seed, { ...job, status: "painting", startedAt: Date.now() });
         emit();
       }
       let frames = 0;
@@ -136,13 +193,17 @@ export function ensureRealmArt(
           if (final) {
             artCache.set(seed, dataUrl);
             writeLS(seed, dataUrl);
+            void writeIDB(seed, dataUrl);
           } else {
             frames++;
             const j = jobs.get(seed);
             if (j) {
               // partial_images=3 → up to 3 partials before final; cap at 0.9.
-              j.progress = Math.min(0.9, frames / 4);
-              j.lastFrameAt = Date.now();
+              jobs.set(seed, {
+                ...j,
+                progress: Math.min(0.9, frames / 4),
+                lastFrameAt: Date.now(),
+              });
               emit();
             }
           }
@@ -153,6 +214,7 @@ export function ensureRealmArt(
         .then((finalUrl) => {
           artCache.set(seed, finalUrl);
           writeLS(seed, finalUrl);
+          void writeIDB(seed, finalUrl);
           resolve(finalUrl);
         })
         .catch((err) => reject(err))
@@ -164,11 +226,26 @@ export function ensureRealmArt(
           emit();
           pump();
         });
+      };
+      const entry = { seed, run };
+      if (priority === "foreground") queue.unshift(entry);
+      else queue.push(entry);
+      pump();
     };
-    const entry = { seed, run };
-    if (priority === "foreground") queue.unshift(entry);
-    else queue.push(entry);
-    pump();
+
+    readIDB(seed)
+      .then((disk) => {
+        if (disk) {
+          artCache.set(seed, disk);
+          notifyFrameListeners(seed, disk, true);
+          resolve(disk);
+          inflight.delete(seed);
+          frameListeners.delete(seed);
+          return;
+        }
+        startNetworkJob();
+      })
+      .catch(startNetworkJob);
   });
 
   inflight.set(seed, task);
