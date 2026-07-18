@@ -239,6 +239,8 @@ export function ensureRealmArt(
           artCache.set(seed, disk);
           notifyFrameListeners(seed, disk, true);
           resolve(disk);
+          inflight.delete(seed);
+          frameListeners.delete(seed);
           return;
         }
         startNetworkJob();
