@@ -513,22 +513,21 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
 }
 
 
-function Dot({ color, ring }: { color: string; ring?: boolean }) {
-  if (ring) {
-    return (
-      <span
-        className="inline-block h-2 w-2 rounded-full align-middle"
-        style={{ background: "#000", boxShadow: `0 0 0 1px ${color}, 0 0 6px ${color}` }}
-      />
-    );
-  }
-  return (
-    <span
-      className="inline-block h-2 w-2 rounded-full align-middle"
-      style={{ background: color, boxShadow: `0 0 6px ${color}` }}
-    />
-  );
+function Dot({
+  color,
+  ring,
+  size = 8,
+}: {
+  color: string;
+  ring?: boolean;
+  size?: number;
+}) {
+  const style = ring
+    ? { background: "#000", boxShadow: `0 0 0 1.5px ${color}, 0 0 8px ${color}`, width: size, height: size }
+    : { background: color, boxShadow: `0 0 8px ${color}`, width: size, height: size };
+  return <span className="inline-block rounded-full align-middle" style={style} />;
 }
+
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
