@@ -198,63 +198,50 @@ export function Minimap({
                   : "text-white/70 hover:text-white"
               }`}
             >
-              2d
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("3d")}
-              className={`px-2 py-0.5 transition-colors ${
-                mode === "3d"
-                  ? "bg-white/90 text-black"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              3d
-            </button>
-          </div>
-          <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
-              aria-label="zoom out"
-              className="px-2 py-0.5 hover:bg-white/10 hover:text-white"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
-              aria-label="zoom in"
-              className="px-2 py-0.5 border-l border-white/15 hover:bg-white/10 hover:text-white"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={resetView}
-              aria-label="recenter on start"
-              className="px-2 py-0.5 border-l border-white/15 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
-            >
-              home
-            </button>
-          </div>
-          {!fullscreen && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
-            >
-              {expanded ? "shrink" : "expand"}
-            </button>
+        <div className="flex items-center gap-2" ref={menuRef}>
+          {(fullscreen || expanded) ? (
+            <ControlBar
+              mode={mode}
+              setMode={setMode}
+              setZoom={setZoom}
+              resetView={resetView}
+              expanded={expanded}
+              fullscreen={fullscreen}
+              setExpanded={setExpanded}
+              setFullscreen={setFullscreen}
+            />
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="chart controls"
+                aria-expanded={menuOpen}
+                className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+              >
+                ⋯
+              </button>
+              {menuOpen && (
+                <div
+                  className="absolute right-0 top-full z-20 mt-1 flex flex-col gap-2 rounded-lg border border-white/15 bg-black/90 p-2 shadow-xl backdrop-blur"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ControlBar
+                    mode={mode}
+                    setMode={setMode}
+                    setZoom={setZoom}
+                    resetView={resetView}
+                    expanded={expanded}
+                    fullscreen={fullscreen}
+                    setExpanded={(v) => { setExpanded(v); setMenuOpen(false); }}
+                    setFullscreen={(v) => { setFullscreen(v); setMenuOpen(false); }}
+                    stacked
+                  />
+                </div>
+              )}
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setFullscreen((v) => !v)}
-            aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
-            className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white"
-          >
-            {fullscreen ? "close" : "full"}
-          </button>
         </div>
       </div>
 
