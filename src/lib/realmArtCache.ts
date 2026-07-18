@@ -120,8 +120,8 @@ export function ensureRealmArt(
             frames++;
             const j = jobs.get(seed);
             if (j) {
-              // Assume ~3 partial frames before final; cap at 0.9.
-              j.progress = Math.min(0.9, frames / 3);
+              // partial_images=3 → up to 3 partials before final; cap at 0.9.
+              j.progress = Math.min(0.9, frames / 4);
               emit();
             }
           }
