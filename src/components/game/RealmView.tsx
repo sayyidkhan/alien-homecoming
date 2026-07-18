@@ -152,7 +152,7 @@ export function RealmView({
     const rect = containerRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    onMoveAlien(Math.max(0.06, Math.min(0.94, x)), Math.max(0.55, Math.min(0.86, y)));
+    onMoveAlien(Math.max(0.04, Math.min(0.96, x)), Math.max(0.08, Math.min(0.94, y)));
   }
 
   return (
