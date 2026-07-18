@@ -187,18 +187,8 @@ export function Minimap({
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
           star chart
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
-            <button
-              type="button"
-              onClick={() => setMode("2d")}
-              className={`px-2 py-0.5 transition-colors ${
-                mode === "2d"
-                  ? "bg-white/90 text-black"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
         <div className="flex items-center gap-2" ref={menuRef}>
+
           {(fullscreen || expanded) ? (
             <ControlBar
               mode={mode}
