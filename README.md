@@ -22,7 +22,7 @@ Wander far enough and you may find one of three **Home Echoes** — resonant fra
 ## Core Features
 
 - **Generative realms** — Full-bleed illustrated scenes generated via the Lovable AI Gateway (`openai/gpt-image-2`, with a Gemini flash fallback for speed), streamed in with a cosmic loading state.
-- **Persistent multiverse** — A deterministic realm graph with six handcrafted node families and branching paths. Progress, discoveries, and every painted realm are cached to `localStorage` + IndexedDB, so nothing is ever re-generated.
+- **Shared multiverse** — One collective realm graph and art library for every player; each device still keeps a local cache for fast reloads.
 - **Walkable scenes** — The alien is a DOM sprite you can steer across each painted realm; clickable portals warp you between worlds with a "the way you came" portal that gently pulses into view.
 - **Star Chart minimap** — A cosmos-styled map of every realm you have visited, with 2D / 3D projection, drag-to-rotate, wheel zoom, pan, home recenter, expand and fullscreen — collapsed behind a `⋯` dropdown on small screens.
 - **Atlas of Worlds** — A grid of every discovered realm with its AI thumbnail; click any card to jump straight there.
@@ -34,7 +34,7 @@ Wander far enough and you may find one of three **Home Echoes** — resonant fra
 - **TanStack Start v1** on Vite 7 (React 19, SSR-safe client-only game shell)
 - **TypeScript** (strict) + Tailwind CSS v4
 - **Lovable AI Gateway** for streamed image generation (`openai/gpt-image-2`, `google/gemini-3.1-flash-lite-image`)
-- **IndexedDB** for durable realm-art caching, `localStorage` for adventure state
+- **Cloudflare Durable Objects** for the shared adventure, **R2** for generated realm art, with IndexedDB/localStorage as device caches
 - Deterministic seeded generation (`mulberry32`) for the realm graph
 - Hand-rolled isometric SVG projection for the Star Chart
 

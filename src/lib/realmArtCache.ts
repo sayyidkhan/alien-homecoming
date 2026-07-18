@@ -16,7 +16,7 @@ export type PrewarmJob = {
   seed: string;
   title: string;
   status: "queued" | "painting";
-  progress: number; // 0..1 (partial frames count / expected)
+  progress: number;
   createdAt: number;
   startedAt?: number;
   lastFrameAt?: number;
@@ -68,6 +68,7 @@ function readLS(seed: string): string | null {
     return null;
   }
 }
+
 function writeLS(seed: string, dataUrl: string) {
   try {
     localStorage.setItem(LS_PREFIX + seed, dataUrl);
@@ -181,7 +182,6 @@ export function ensureRealmArt(
 
   const task = new Promise<string>((resolve, reject) => {
     const startNetworkJob = () => {
-      // Register the job only after the persistent cache has been checked.
       jobs.set(seed, { seed, title, status: "queued", progress: 0, createdAt: Date.now() });
       emit();
 
@@ -204,7 +204,6 @@ export function ensureRealmArt(
               frames++;
               const j = jobs.get(seed);
               if (j) {
-                // partial_images=3 → up to 3 partials before final; cap at 0.9.
                 jobs.set(seed, {
                   ...j,
                   progress: Math.min(0.9, frames / 4),
