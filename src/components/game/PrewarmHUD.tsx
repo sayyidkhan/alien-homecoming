@@ -42,10 +42,6 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
       <ul className="flex flex-col gap-1.5 min-w-[220px]">
         {bg.map((j) => (
           <li key={j.seed} className="flex items-center gap-3">
-            {(() => {
-              const elapsed = Math.max(0, Math.floor((now - j.createdAt) / 1000));
-              return null;
-            })()}
             <span
               className="truncate font-serif text-xs text-white/90"
               style={{ maxWidth: 180 }}
@@ -65,7 +61,9 @@ export function PrewarmHUD({ currentSeed }: { currentSeed: string }) {
               />
             </div>
             <span className="w-20 text-right text-[9px] uppercase tracking-[0.2em] text-white/50">
-              {j.status === "queued" ? "queued" : `${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`}
+              {j.status === "queued"
+                ? `queued ${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`
+                : `${Math.max(0, Math.floor((now - j.createdAt) / 1000))}s`}
             </span>
           </li>
         ))}
