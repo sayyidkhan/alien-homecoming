@@ -6,6 +6,7 @@ import { Minimap } from "@/components/game/Minimap";
 import { HUD, DiscoveryToast } from "@/components/game/HUD";
 import { Transition } from "@/components/game/Transition";
 import { WorldAtlas } from "@/components/game/WorldAtlas";
+import { PrewarmHUD } from "@/components/game/PrewarmHUD";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -128,6 +129,7 @@ function GameInner() {
       />
       <DiscoveryToast message={toast} />
       <Minimap state={state} onJump={handleJump} />
+      <PrewarmHUD currentSeed={currentRealm.seed} />
       <button
         type="button"
         onClick={() => setAtlasOpen(true)}

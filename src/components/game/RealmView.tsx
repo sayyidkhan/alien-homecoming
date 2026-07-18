@@ -88,7 +88,9 @@ export function RealmView({
           undefined,
           undefined,
           "background",
+          dest.title,
         ).catch(() => {});
+
       } catch {
         /* ignore planning errors */
       }
