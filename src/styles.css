@@ -198,6 +198,7 @@
   opacity: 0;
 }
 .toast-in { animation: toastIn 0.4s ease forwards; }
+.intro-fade { animation: textIn 1.2s ease forwards; }
 
 .minimap {
   position: absolute;
