@@ -238,7 +238,6 @@ export function ensureRealmArt(
         if (disk) {
           artCache.set(seed, disk);
           notifyFrameListeners(seed, disk, true);
-          onFrame?.(disk, true);
           resolve(disk);
           return;
         }
