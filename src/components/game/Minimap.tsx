@@ -326,9 +326,10 @@ export function Minimap({
           const isCurrent = r.id === state.currentRealmId;
           const hasUnfound = r.discoveries.some((d) => !d.found);
           const labelBelow = idx % 2 === 0;
-          const labelY = labelBelow ? 22 : -16;
-          const title = truncate(r.title, expanded ? 22 : 14);
-          const labelW = Math.max(38, title.length * 5.2);
+          const labelY = labelBelow ? 26 : -20;
+          const title = truncate(r.title, fullscreen ? 30 : expanded ? 24 : 16);
+          const fontSize = fullscreen ? 9 : 8;
+          const labelW = Math.max(44, title.length * (fontSize * 0.72));
           const s = pos.scale;
 
           return (
@@ -342,10 +343,10 @@ export function Minimap({
               <CelestialBody body={body} seed={r.id} />
               {isCurrent && (
                 <circle
-                  r={15}
+                  r={13}
                   fill="none"
-                  stroke="#fff"
-                  strokeWidth={1.1}
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
                   className="minimap-current"
                 />
               )}
@@ -355,21 +356,21 @@ export function Minimap({
               <g transform={`translate(0, ${labelY})`}>
                 <rect
                   x={-labelW / 2}
-                  y={-6}
+                  y={-fontSize + 1}
                   width={labelW}
-                  height={12}
-                  rx={6}
-                  fill="rgba(10,6,24,0.72)"
-                  stroke="rgba(255,255,255,0.08)"
+                  height={fontSize + 4}
+                  rx={(fontSize + 4) / 2}
+                  fill="rgba(8,4,20,0.88)"
+                  stroke="rgba(255,255,255,0.12)"
                   strokeWidth={0.5}
                 />
                 <text
                   textAnchor="middle"
-                  y={2.5}
-                  fontSize={7}
-                  fill="rgba(255,255,255,0.9)"
+                  y={2.8}
+                  fontSize={fontSize}
+                  fill="rgba(255,255,255,0.95)"
                   fontFamily="system-ui, sans-serif"
-                  letterSpacing="0.03em"
+                  letterSpacing="0.02em"
                 >
                   {title}
                 </text>
