@@ -36,7 +36,11 @@ export function Minimap({
   const [mode, setMode] = useState<ViewMode>("2d");
   // Static tilt angle for 3D; user can drag to rotate.
   const [yaw, setYaw] = useState(-0.4);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+
 
   const layout = useMemo(() => positionNodes(state), [state]);
   const size = fullscreen ? undefined : expanded ? 520 : 240;
