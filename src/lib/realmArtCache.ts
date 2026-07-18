@@ -17,18 +17,27 @@ export type PrewarmJob = {
 
 const jobs = new Map<string, PrewarmJob>();
 const listeners = new Set<() => void>();
+const EMPTY_SNAPSHOT: PrewarmJob[] = [];
+let snapshot: PrewarmJob[] = EMPTY_SNAPSHOT;
 
 function emit() {
+  snapshot = jobs.size === 0 ? EMPTY_SNAPSHOT : Array.from(jobs.values());
   listeners.forEach((l) => l());
 }
 
 export function subscribePrewarm(fn: () => void): () => void {
   listeners.add(fn);
-  return () => listeners.delete(fn);
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 export function getPrewarmSnapshot(): PrewarmJob[] {
-  return Array.from(jobs.values());
+  return snapshot;
+}
+
+export function getPrewarmServerSnapshot(): PrewarmJob[] {
+  return EMPTY_SNAPSHOT;
 }
 
 function readLS(seed: string): string | null {
