@@ -1,4 +1,5 @@
 import { streamRealmImage } from "./streamRealmImage";
+import { getSharedArtUrl, saveSharedArt } from "./worldApi";
 
 const LS_PREFIX = "realm-art-v2:";
 const MAX_CONCURRENT = 2;
@@ -50,10 +51,7 @@ export function getJobForSeed(seed: string): PrewarmJob | null {
   return jobs.get(seed) ?? null;
 }
 
-function addFrameListener(
-  seed: string,
-  listener: (dataUrl: string, isFinal: boolean) => void,
-) {
+function addFrameListener(seed: string, listener: (dataUrl: string, isFinal: boolean) => void) {
   const listeners = frameListeners.get(seed) ?? new Set();
   listeners.add(listener);
   frameListeners.set(seed, listeners);
@@ -112,7 +110,10 @@ async function writeIDB(seed: string, dataUrl: string): Promise<void> {
     const db = await openArtDB();
     if (!db) return;
     await new Promise<void>((resolve) => {
-      const req = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(dataUrl, seed);
+      const req = db
+        .transaction(STORE_NAME, "readwrite")
+        .objectStore(STORE_NAME)
+        .put(dataUrl, seed);
       req.onsuccess = () => resolve();
       req.onerror = () => resolve();
     });
@@ -140,7 +141,12 @@ export async function getCachedArtAsync(seed: string): Promise<string | null> {
     artCache.set(seed, disk);
     return disk;
   }
-  return null;
+  const shared = await getSharedArtUrl(seed).catch(() => null);
+  if (shared) {
+    artCache.set(seed, shared);
+    writeLS(seed, shared);
+  }
+  return shared;
 }
 
 function pump() {
@@ -180,52 +186,58 @@ export function ensureRealmArt(
       emit();
 
       const run = () => {
-      active++;
-      const job = jobs.get(seed);
-      if (job) {
-        jobs.set(seed, { ...job, status: "painting", startedAt: Date.now() });
-        emit();
-      }
-      let frames = 0;
-      streamRealmImage(
-        prompt,
-        (dataUrl, final) => {
-          if (final) {
-            artCache.set(seed, dataUrl);
-            writeLS(seed, dataUrl);
-            void writeIDB(seed, dataUrl);
-          } else {
-            frames++;
-            const j = jobs.get(seed);
-            if (j) {
-              // partial_images=3 → up to 3 partials before final; cap at 0.9.
-              jobs.set(seed, {
-                ...j,
-                progress: Math.min(0.9, frames / 4),
-                lastFrameAt: Date.now(),
-              });
-              emit();
-            }
-          }
-          notifyFrameListeners(seed, dataUrl, final);
-        },
-        signal,
-      )
-        .then((finalUrl) => {
-          artCache.set(seed, finalUrl);
-          writeLS(seed, finalUrl);
-          void writeIDB(seed, finalUrl);
-          resolve(finalUrl);
-        })
-        .catch((err) => reject(err))
-        .finally(() => {
-          active--;
-          inflight.delete(seed);
-          frameListeners.delete(seed);
-          jobs.delete(seed);
+        active++;
+        const job = jobs.get(seed);
+        if (job) {
+          jobs.set(seed, { ...job, status: "painting", startedAt: Date.now() });
           emit();
-          pump();
-        });
+        }
+        let frames = 0;
+        streamRealmImage(
+          prompt,
+          (dataUrl, final) => {
+            if (final) {
+              artCache.set(seed, dataUrl);
+              writeLS(seed, dataUrl);
+              void writeIDB(seed, dataUrl);
+            } else {
+              frames++;
+              const j = jobs.get(seed);
+              if (j) {
+                // partial_images=3 → up to 3 partials before final; cap at 0.9.
+                jobs.set(seed, {
+                  ...j,
+                  progress: Math.min(0.9, frames / 4),
+                  lastFrameAt: Date.now(),
+                });
+                emit();
+              }
+            }
+            notifyFrameListeners(seed, dataUrl, final);
+          },
+          signal,
+        )
+          .then((finalUrl) => {
+            artCache.set(seed, finalUrl);
+            writeLS(seed, finalUrl);
+            void writeIDB(seed, finalUrl);
+            void saveSharedArt(seed, finalUrl).then((sharedUrl) => {
+              if (!sharedUrl) return;
+              artCache.set(seed, sharedUrl);
+              writeLS(seed, sharedUrl);
+              void writeIDB(seed, sharedUrl);
+            });
+            resolve(finalUrl);
+          })
+          .catch((err) => reject(err))
+          .finally(() => {
+            active--;
+            inflight.delete(seed);
+            frameListeners.delete(seed);
+            jobs.delete(seed);
+            emit();
+            pump();
+          });
       };
       const entry = { seed, run };
       if (priority === "foreground") queue.unshift(entry);
@@ -233,12 +245,12 @@ export function ensureRealmArt(
       pump();
     };
 
-    readIDB(seed)
-      .then((disk) => {
-        if (disk) {
-          artCache.set(seed, disk);
-          notifyFrameListeners(seed, disk, true);
-          resolve(disk);
+    getCachedArtAsync(seed)
+      .then((cachedArt) => {
+        if (cachedArt) {
+          artCache.set(seed, cachedArt);
+          notifyFrameListeners(seed, cachedArt, true);
+          resolve(cachedArt);
           inflight.delete(seed);
           frameListeners.delete(seed);
           return;

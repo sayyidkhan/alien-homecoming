@@ -4,6 +4,13 @@
 **One-sentence pitch:** A tiny alien wanders an AI-painted multiverse, hopping between hand-crafted realms and chasing three Home Echoes to find the doorway back.
 **Project link:** https://alien-homecoming.lovable.app
 
+**Domain name suggestions:**
+
+- magicalwayback.com
+- thewayback.dev
+- thewaybackgame.com
+- waybackexplore.com
+
 ---
 
 ## About
@@ -47,3 +54,14 @@ bun run dev
 ```
 
 Enable the Lovable AI Gateway in the project so the `/api/generate-realm` server route can stream images. Without it, realms will stay in the loading state.
+
+## Shared world on Cloudflare
+
+The Lovable app and the Cloudflare backend share this repository. The frontend stays deployed by Lovable; `worker/` is a small Cloudflare Worker containing a single Durable Object for the collective adventure and an R2 bucket for the generated artwork.
+
+```bash
+npx wrangler r2 bucket create alien-homecoming-art
+npm run worker:deploy
+```
+
+After deployment, set `VITE_WORLD_API_URL` in Lovable to the Worker URL printed by Wrangler (for example, `https://alien-homecoming-world.<account>.workers.dev`). This is a public endpoint URL, not a secret. Realm art is fetched from R2 before a device invokes image generation, while IndexedDB remains a local speed cache.
