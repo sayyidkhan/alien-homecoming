@@ -389,9 +389,10 @@ export function Minimap({
           const isCurrent = r.id === state.currentRealmId;
           const hasUnfound = r.discoveries.some((d) => !d.found);
           const labelBelow = idx % 2 === 0;
-          const labelY = labelBelow ? 26 : -20;
-          const title = truncate(r.title, fullscreen ? 30 : expanded ? 24 : 16);
-          const fontSize = fullscreen ? 9 : 8;
+          const labelY = labelBelow ? 22 : -16;
+          const title = truncate(r.title, fullscreen ? 26 : expanded ? 20 : 14);
+          const fontSize = (fullscreen ? 7 : 6) / Math.max(0.75, Math.min(zoom, 1.6));
+
           const labelW = Math.max(44, title.length * (fontSize * 0.72));
           const s = pos.scale;
 
