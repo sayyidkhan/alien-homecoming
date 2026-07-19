@@ -14,33 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      realm_art: {
-        Row: {
-          created_at: string
-          family: string | null
-          public_url: string
-          seed: string
-          storage_path: string
-          title: string | null
-        }
-        Insert: {
-          created_at?: string
-          family?: string | null
-          public_url: string
-          seed: string
-          storage_path: string
-          title?: string | null
-        }
-        Update: {
-          created_at?: string
-          family?: string | null
-          public_url?: string
-          seed?: string
-          storage_path?: string
-          title?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
