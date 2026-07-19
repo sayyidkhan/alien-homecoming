@@ -8,9 +8,11 @@ import {
   watchSharedArt,
 } from "./worldApi";
 
-const LS_PREFIX = "realm-art-v2:";
+// Bumped to v3 for the Tigris-only reset: any locally cached PNGs from the
+// previous Supabase/Lovable storage era are ignored and re-fetched.
+const LS_PREFIX = "realm-art-v3:";
 const MAX_CONCURRENT = 2;
-const DB_NAME = "lost-between-worlds-art";
+const DB_NAME = "lost-between-worlds-art-v3";
 const STORE_NAME = "realm-art";
 
 const artCache = new Map<string, string>();
