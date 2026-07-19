@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "tigris:migrate": "node scripts/migrate-assets-to-tigris.mjs",
     "worker:dev": "npx wrangler dev --config worker/wrangler.jsonc",
     "worker:deploy": "npx wrangler deploy --config worker/wrangler.jsonc"
   },

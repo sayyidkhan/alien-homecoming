@@ -2,20 +2,16 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import type { RealmNode, Portal, Discovery } from "@/game/types";
 import { Alien } from "./Alien";
 import { buildRealmPrompt } from "@/lib/streamRealmImage";
-import {
-  ensureRealmArt,
-  getCachedArt,
-  subscribePrewarm,
-  getJobForSeed,
-} from "@/lib/realmArtCache";
+import { ensureRealmArt, getCachedArt, subscribePrewarm, getJobForSeed } from "@/lib/realmArtCache";
 import { planRealm } from "@/game/realmPlanner";
 
 function useSeedProgress(seed: string): {
-  status: "queued" | "waiting" | "painting" | "retrying" | "idle";
+  status: "queued" | "waiting" | "painting" | "retrying" | "failed" | "idle";
   progress: number;
   createdAt?: number;
   startedAt?: number;
   lastFrameAt?: number;
+  error?: "local-image-service" | "image-service";
 } {
   const job = useSyncExternalStore(
     subscribePrewarm,
@@ -29,6 +25,7 @@ function useSeedProgress(seed: string): {
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     lastFrameAt: job.lastFrameAt,
+    error: job.error,
   };
 }
 
@@ -72,6 +69,8 @@ export function RealmView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverPortal, setHoverPortal] = useState<string | null>(null);
   const [justCelebrated, setJustCelebrated] = useState(false);
+  const [paintAttempt, setPaintAttempt] = useState(0);
+  const realmPrompt = useMemo(() => buildRealmPrompt(realm), [realm]);
 
   // Foreground: paint the current realm.
   useEffect(() => {
@@ -87,7 +86,7 @@ export function RealmView({
     let alive = true;
     ensureRealmArt(
       realm.seed,
-      buildRealmPrompt(realm),
+      realmPrompt,
       (dataUrl, final) => {
         if (!alive) return;
         setArt(dataUrl);
@@ -100,7 +99,7 @@ export function RealmView({
     return () => {
       alive = false;
     };
-  }, [realm.seed]);
+  }, [realm.seed, realmPrompt, paintAttempt]);
 
   // Background prewarm: speculatively plan the destination realm for each
   // unexplored portal and start painting its art now, so it's ready (or
@@ -127,7 +126,6 @@ export function RealmView({
           "background",
           dest.title,
         ).catch(() => {});
-
       } catch {
         /* ignore planning errors */
       }
@@ -182,7 +180,13 @@ export function RealmView({
       <div className="pointer-events-none absolute inset-0 realm-particles" />
 
       {/* Loading screen — shown until first pixels arrive */}
-      {!art && <RealmLoading title={realm.title} seed={realm.seed} />}
+      {!art && (
+        <RealmLoading
+          title={realm.title}
+          seed={realm.seed}
+          onRetry={() => setPaintAttempt((n) => n + 1)}
+        />
+      )}
 
       {/* Painting-in indicator (after first partial pixels) */}
       {art && !isFinal && <PaintingProgress seed={realm.seed} />}
@@ -238,7 +242,11 @@ export function RealmView({
             aria-label={`${p.title}${locked ? " (locked)" : ""}`}
           >
             <span className="portal-glow" />
-            {isBack && <span className="portal-back-arrow" aria-hidden>↩</span>}
+            {isBack && (
+              <span className="portal-back-arrow" aria-hidden>
+                ↩
+              </span>
+            )}
             <span className="portal-label">
               {isBack ? "◂ " : ""}
               {p.title}
@@ -261,8 +269,16 @@ export function RealmView({
   );
 }
 
-function RealmLoading({ title, seed }: { title: string; seed: string }) {
-  const { status, progress, createdAt, startedAt, lastFrameAt } = useSeedProgress(seed);
+function RealmLoading({
+  title,
+  seed,
+  onRetry,
+}: {
+  title: string;
+  seed: string;
+  onRetry: () => void;
+}) {
+  const { status, progress, createdAt, startedAt, lastFrameAt, error } = useSeedProgress(seed);
   const elapsed = useElapsedSeconds(createdAt);
   const paintingElapsed = useElapsedSeconds(startedAt);
   const frameElapsed = useElapsedSeconds(lastFrameAt);
@@ -270,23 +286,29 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
   const statusLine =
     status === "queued"
       ? `Queued for ${elapsed}s · waiting for an image slot`
-      : status === "waiting"
-        ? "Another traveller is painting this realm · reusing their finished art"
-        : status === "retrying"
-          ? "The painter stepped away · safely claiming the next attempt"
-      : progress > 0
-        ? `Painting for ${paintingElapsed}s · last pixels ${frameElapsed}s ago`
-        : `Contacting painter · ${elapsed}s elapsed`;
+      : status === "failed"
+        ? error === "local-image-service"
+          ? "Local image service is not configured"
+          : "The image service could not complete this realm"
+        : status === "waiting"
+          ? "Another traveller is painting this realm · reusing their finished art"
+          : status === "retrying"
+            ? "The painter stepped away · safely claiming the next attempt"
+            : progress > 0
+              ? `Painting for ${paintingElapsed}s · last pixels ${frameElapsed}s ago`
+              : `Contacting painter · ${elapsed}s elapsed`;
   const label =
     status === "queued"
       ? "Queued · waiting for a painter"
-      : status === "waiting"
-        ? "Another traveller is painting this realm"
-        : status === "retrying"
-          ? "Retrying this realm safely"
-      : progress > 0
-        ? `Painting · ${pct}%`
-        : "Painting a new universe";
+      : status === "failed"
+        ? "Painting needs attention"
+        : status === "waiting"
+          ? "Another traveller is painting this realm"
+          : status === "retrying"
+            ? "Retrying this realm safely"
+            : progress > 0
+              ? `Painting · ${pct}%`
+              : "Painting a new universe";
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#05030f]">
       <div className="loading-starfield absolute inset-0" />
@@ -298,9 +320,7 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
           <div className="loading-orb-ring-2 absolute inset-0 rounded-full" />
         </div>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-[0.4em] text-white/60">
-            {label}
-          </div>
+          <div className="text-[10px] uppercase tracking-[0.4em] text-white/60">{label}</div>
           <div className="mt-2 font-serif text-2xl text-white/95">{title}</div>
           <div className="mt-3 flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.25em] text-white/60">
             <span>Elapsed {elapsed}s</span>
@@ -319,17 +339,30 @@ function RealmLoading({ title, seed }: { title: string; seed: string }) {
                     ? "20%"
                     : status === "retrying"
                       ? "15%"
-                  : progress > 0
-                    ? `${Math.max(8, pct)}%`
-                    : "12%",
+                      : progress > 0
+                        ? `${Math.max(8, pct)}%`
+                        : "12%",
             }}
           />
         </div>
         <div className="text-[9px] uppercase tracking-[0.3em] text-white/45">
-          {elapsed > 25
-            ? "still working — this request can take longer when the image service is busy"
-            : "first pixels usually arrive in ~5–10s"}
+          {status === "failed"
+            ? error === "local-image-service"
+              ? "Run locally with a server-side LOVABLE_API_KEY, or test this in Lovable"
+              : "Check the image service, then try again"
+            : elapsed > 25
+              ? "still working — this request can take longer when the image service is busy"
+              : "first pixels usually arrive in ~5–10s"}
         </div>
+        {status === "failed" && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-[10px] uppercase tracking-[0.24em] text-white/90 transition hover:bg-white/20"
+          >
+            Try again
+          </button>
+        )}
       </div>
     </div>
   );

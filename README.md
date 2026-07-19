@@ -1,80 +1,82 @@
 # Lost Between Worlds
 
-**Team name:** alien-homecoming
-**One-sentence pitch:** A tiny alien wanders an AI-painted multiverse, hopping between hand-crafted realms and chasing three Home Echoes to find the doorway back.
-**Project link:** https://alien-homecoming.lovable.app
+A browser-based, AI-painted exploration game. Players keep their own journey locally, while the universe's finished realm artwork is shared globally so the same realm is never generated twice under normal use.
 
-**Domain name suggestions:**
+- **Live app:** https://alien-homecoming.lovable.app
+- **Release marker:** the bottom-left stamp in the game identifies the deployed frontend revision.
 
-- magicalwayback.com
-- thewayback.dev
-- thewaybackgame.com
-- waybackexplore.com
+## What is shared vs local
 
----
+| Scope                                            | Location                                | Why                                       |
+| ------------------------------------------------ | --------------------------------------- | ----------------------------------------- |
+| Player route, discoveries, Home Echoes, position | Browser `localStorage`                  | Personal progression; no account needed.  |
+| Fast image cache                                 | Browser memory + IndexedDB              | Instant reloads on the same device.       |
+| Canonical realm-art library and jobs             | Cloudflare D1 + Durable Object + Tigris | One image per realm seed for all players. |
 
-## About
+When a realm is missing, the first browser gets a short generation lease. Other browsers wait over WebSocket. Once the owner finishes generating the image, the Worker stores it in Tigris and announces the final shared URL.
 
-*Lost Between Worlds* is a browser-based generative exploration game. You control a tiny traveller adrift in a persistent multiverse of dreamlike realms. Every world is illustrated on demand by an image model, but the multiverse itself is a deterministic graph — the same seed always weaves the same constellation of places, so your journey is yours to keep.
+At startup, the app scans every realm known to that browser and backfills any legacy browser-cached image to Tigris—no extra image generation is required.
 
-Wander far enough and you may find one of three **Home Echoes** — resonant fragments of the place you came from. Collect all three and the final doorway home opens.
-
-## Core Features
-
-- **Generative realms** — Full-bleed illustrated scenes generated via the Lovable AI Gateway (`openai/gpt-image-2`, with a Gemini flash fallback for speed), streamed in with a cosmic loading state.
-- **Shared universe art** — Every player keeps their own route, discoveries and Home Echoes locally. The canonical realm-art library is global, so a finished realm is reused on every device.
-- **Walkable scenes** — The alien is a DOM sprite you can steer across each painted realm; clickable portals warp you between worlds with a "the way you came" portal that gently pulses into view.
-- **Star Chart minimap** — A cosmos-styled map of every realm you have visited, with 2D / 3D projection, drag-to-rotate, wheel zoom, pan, home recenter, expand and fullscreen — collapsed behind a `⋯` dropdown on small screens.
-- **Atlas of Worlds** — A grid of every discovered realm with its AI thumbnail; click any card to jump straight there.
-- **Prewarming** — Neighbouring realms paint speculatively in the background while you explore, with a live "painting ahead" HUD.
-- **Home Echoes** — Three collectible resonances gate the final doorway; discoveries and inventory persist across sessions.
-
-## Tech Stack
-
-- **TanStack Start v1** on Vite 7 (React 19, SSR-safe client-only game shell)
-- **TypeScript** (strict) + Tailwind CSS v4
-- **Lovable AI Gateway** for streamed image generation (`openai/gpt-image-2`, `google/gemini-3.1-flash-lite-image`)
-- **Cloudflare D1 + Durable Objects** for the global realm registry and single-flight art leases; **Tigris** for image bytes; IndexedDB/localStorage for device caches
-- Deterministic seeded generation (`mulberry32`) for the realm graph
-- Hand-rolled isometric SVG projection for the Star Chart
-
-## How to Play
-
-1. Open the project link.
-2. Walk your alien around the realm; click any portal to travel.
-3. Use the **↩ blue portal** to return the way you came.
-4. Open the **Star Chart** (bottom-right) to see the cosmos you have mapped, or the **Atlas** to jump to any discovered world.
-5. Find the three Home Echoes. Step through the final doorway. Go home.
-
-## Local Development
+## Local development
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
-Enable the Lovable AI Gateway in the project so the `/api/generate-realm` server route can stream images. Without it, realms will stay in the loading state.
+The frontend is available at `http://127.0.0.1:8080/`.
 
-## Shared universe service
-
-The Lovable app and the Cloudflare backend share this repository. The frontend stays deployed by Lovable; `worker/` is a thin Cloudflare Worker with:
-
-- **D1** — canonical realm records and the `art_jobs` audit trail.
-- **Durable Object** — one global lease coordinator. One browser paints a missing realm; other browsers wait for its final image.
-- **Tigris** — private S3-compatible image storage, proxied by the Worker.
-
-Player progression never goes through this service; it remains in the browser.
-
-The D1 database is configured in `worker/wrangler.jsonc`. Before the first Worker deploy, create a Tigris bucket named `alien-homecoming-art`, then add its S3 credentials as Worker secrets:
+To use a local Worker instead of the deployed shared-world service, run in a second terminal:
 
 ```bash
-npx wrangler secret put TIGRIS_STORAGE_ACCESS_KEY_ID --config worker/wrangler.jsonc
-npx wrangler secret put TIGRIS_STORAGE_SECRET_ACCESS_KEY --config worker/wrangler.jsonc
-npx wrangler deploy --config worker/wrangler.jsonc
+cp worker/.dev.vars.example worker/.dev.vars
+npx wrangler d1 execute alien-homecoming-universe --local --config worker/wrangler.jsonc --file worker/migrations/0001_universe.sql
+npm run worker:dev
 ```
 
-After deployment, set `VITE_WORLD_API_URL` in Lovable to the Worker URL printed by Wrangler (for example, `https://alien-homecoming-universe.<account>.workers.dev`). This is a public endpoint URL, not a secret. Realm art is fetched from the Worker before a device invokes image generation, while IndexedDB remains a local speed cache.
+Then create `.env.local` with:
 
-Use `.env.example` for the public Lovable/Vite value. Tigris credential names and a local Worker template are in `worker/.dev.vars.example`; do not put those credentials in a `VITE_*` variable, because Vite exposes those to browsers.
+```bash
+VITE_WORLD_API_URL=http://127.0.0.1:8787
+```
 
-For a future production hardening pass, validate the image-generation lease in `/api/generate-realm` server-side. The current client-side lease flow prevents normal-player races, but a public no-login MVP can still be bypassed by a malicious direct API caller.
+Never put Tigris access keys in a `VITE_*` variable. Those values are exposed to browsers.
+
+## Asset migration
+
+There are no committed realm images in this repository; the shared library starts clean and grows only when a player visits a new realm. The app also backfills a cached realm image from the same browser to Tigris when it is revisited.
+
+For static files you intentionally want to upload, first preview the operation:
+
+```bash
+npm run tigris:migrate -- path/to/assets
+```
+
+Then upload only after checking the listed object keys:
+
+```bash
+TIGRIS_STORAGE_ENDPOINT=https://t3.storage.dev \
+TIGRIS_BUCKET=alien-homecoming-art \
+TIGRIS_REGION=auto \
+TIGRIS_STORAGE_ACCESS_KEY_ID=... \
+TIGRIS_STORAGE_SECRET_ACCESS_KEY=... \
+npm run tigris:migrate -- path/to/assets --apply
+```
+
+The migration tool handles filesystem/static images only. It never deletes source assets or reads browser IndexedDB.
+
+## Documentation
+
+- [Deployment guide](DEPLOYMENT.md)
+- [Tech stack and architecture](docs/TECH-STACK.md)
+- [Cloudflare Worker notes](worker/README.md)
+
+## Development commands
+
+```bash
+npm run dev             # frontend
+npm run worker:dev      # local Worker + local D1
+npm run build           # production build
+npm run lint            # lint
+npm run tigris:migrate -- path/to/assets
+```

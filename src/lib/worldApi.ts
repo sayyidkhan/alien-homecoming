@@ -2,6 +2,7 @@ import { DEFAULT_WORLD_API_URL } from "./worldConfig";
 
 const configuredApiUrl =
   import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "") ?? DEFAULT_WORLD_API_URL;
+const SHARED_REQUEST_TIMEOUT_MS = 5_000;
 
 // Local development uses Wrangler on this port. Production deliberately needs
 // an explicit URL so a preview never accidentally sends work to the wrong world.
@@ -30,6 +31,19 @@ function endpoint(path: string) {
   return `${worldApiUrl}${path}`;
 }
 
+async function fetchShared(url: string, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort("shared-world-timeout"),
+    SHARED_REQUEST_TIMEOUT_MS,
+  );
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
@@ -41,13 +55,13 @@ export function sharedArtUrl(seed: string) {
 export async function getSharedArtUrl(seed: string): Promise<string | null> {
   const url = sharedArtUrl(seed);
   if (!url) return null;
-  const response = await fetch(url, { method: "HEAD" });
+  const response = await fetchShared(url, { method: "HEAD" });
   return response.ok ? url : null;
 }
 
 export async function claimSharedArt(input: ClaimArtInput): Promise<ArtClaim | null> {
   if (!worldApiUrl) return null;
-  const response = await fetch(endpoint(`/v1/art/${encodeURIComponent(input.seed)}/claim`), {
+  const response = await fetchShared(endpoint(`/v1/art/${encodeURIComponent(input.seed)}/claim`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -61,7 +75,7 @@ export async function completeSharedArt(
   leaseId: string,
   dataUrl: string,
 ): Promise<string> {
-  const response = await fetch(endpoint(`/v1/art/${encodeURIComponent(seed)}/complete`), {
+  const response = await fetchShared(endpoint(`/v1/art/${encodeURIComponent(seed)}/complete`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ leaseId, dataUrl }),
@@ -73,7 +87,7 @@ export async function completeSharedArt(
 
 export async function failSharedArt(seed: string, leaseId: string): Promise<void> {
   if (!worldApiUrl) return;
-  await fetch(endpoint(`/v1/art/${encodeURIComponent(seed)}/fail`), {
+  await fetchShared(endpoint(`/v1/art/${encodeURIComponent(seed)}/fail`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ leaseId }),
@@ -82,7 +96,9 @@ export async function failSharedArt(seed: string, leaseId: string): Promise<void
 
 export function watchSharedArt(seed: string, onUpdate: (update: ArtUpdate) => void) {
   if (!worldApiUrl || typeof window === "undefined") return () => {};
-  const socket = new WebSocket(endpoint(`/v1/art/${encodeURIComponent(seed)}/live`).replace(/^http/, "ws"));
+  const socket = new WebSocket(
+    endpoint(`/v1/art/${encodeURIComponent(seed)}/live`).replace(/^http/, "ws"),
+  );
   socket.addEventListener("message", (event) => {
     try {
       const update = JSON.parse(event.data as string) as ArtUpdate;

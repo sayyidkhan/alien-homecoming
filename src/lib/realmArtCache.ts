@@ -1,5 +1,6 @@
 import { hashString } from "@/game/seed";
-import { streamRealmImage } from "./streamRealmImage";
+import type { RealmNode } from "@/game/types";
+import { buildRealmPrompt, streamRealmImage } from "./streamRealmImage";
 import {
   claimSharedArt,
   completeSharedArt,
@@ -15,6 +16,8 @@ const STORE_NAME = "realm-art";
 
 const artCache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
+const backfills = new Map<string, Promise<void>>();
+const backfillScanned = new Set<string>();
 const frameListeners = new Map<string, Set<(dataUrl: string, isFinal: boolean) => void>>();
 const queue: Array<{ seed: string; run: () => void }> = [];
 let active = 0;
@@ -22,12 +25,13 @@ let active = 0;
 export type PrewarmJob = {
   seed: string;
   title: string;
-  status: "queued" | "waiting" | "painting" | "retrying";
+  status: "queued" | "waiting" | "painting" | "retrying" | "failed";
   progress: number;
   createdAt: number;
   startedAt?: number;
   lastFrameAt?: number;
   leaseExpiresAt?: number;
+  error?: "local-image-service" | "image-service";
 };
 
 const jobs = new Map<string, PrewarmJob>();
@@ -45,6 +49,13 @@ function updateJob(seed: string, changes: Partial<PrewarmJob>) {
   if (!job) return;
   jobs.set(seed, { ...job, ...changes });
   emit();
+}
+
+function classifyGenerationError(error: unknown): PrewarmJob["error"] {
+  const message = error instanceof Error ? error.message : String(error);
+  return /LOVABLE_API_KEY|Image generation failed: 500/.test(message)
+    ? "local-image-service"
+    : "image-service";
 }
 
 export function subscribePrewarm(fn: () => void): () => void {
@@ -114,12 +125,23 @@ async function readIDB(seed: string): Promise<string | null> {
   }
 }
 
+async function getLocalCachedArtAsync(seed: string): Promise<string | null> {
+  const cached = getCachedArt(seed);
+  if (cached) return cached;
+  const disk = await readIDB(seed);
+  if (disk) artCache.set(seed, disk);
+  return disk;
+}
+
 async function writeIDB(seed: string, dataUrl: string): Promise<void> {
   try {
     const db = await openArtDB();
     if (!db) return;
     await new Promise<void>((resolve) => {
-      const request = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(dataUrl, seed);
+      const request = db
+        .transaction(STORE_NAME, "readwrite")
+        .objectStore(STORE_NAME)
+        .put(dataUrl, seed);
       request.onsuccess = request.onerror = () => resolve();
     });
   } catch {
@@ -133,6 +155,34 @@ function saveLocalArt(seed: string, url: string) {
   void writeIDB(seed, url);
 }
 
+/**
+ * Art created before the shared library existed is held as a data URL in a
+ * browser cache. When that realm is next opened, make it canonical without
+ * spending another image-generation request. Only the lease owner uploads;
+ * another browser may already have supplied the canonical copy.
+ */
+function backfillCachedArt(seed: string, prompt: string, title: string, cached: string) {
+  if (!cached.startsWith("data:image/") || backfills.has(seed)) return;
+
+  const task = (async () => {
+    const claim = await claimSharedArt({
+      seed,
+      title,
+      promptHash: hashString(prompt).toString(36),
+    });
+    if (!claim || claim.status !== "owner") return;
+
+    try {
+      const sharedUrl = await completeSharedArt(seed, claim.leaseId, cached);
+      saveLocalArt(seed, sharedUrl);
+    } catch {
+      await failSharedArt(seed, claim.leaseId).catch(() => {});
+    }
+  })().finally(() => backfills.delete(seed));
+
+  backfills.set(seed, task);
+}
+
 export function getCachedArt(seed: string): string | null {
   const mem = artCache.get(seed);
   if (mem) return mem;
@@ -142,16 +192,26 @@ export function getCachedArt(seed: string): string | null {
 }
 
 export async function getCachedArtAsync(seed: string): Promise<string | null> {
-  const cached = getCachedArt(seed);
-  if (cached) return cached;
-  const disk = await readIDB(seed);
-  if (disk) {
-    artCache.set(seed, disk);
-    return disk;
-  }
+  const local = await getLocalCachedArtAsync(seed);
+  if (local) return local;
   const shared = await getSharedArtUrl(seed).catch(() => null);
   if (shared) saveLocalArt(seed, shared);
   return shared;
+}
+
+/**
+ * On startup, inspect every realm already known to this browser. This migrates
+ * legacy IndexedDB/localStorage artwork gradually, with no re-generation and
+ * without fetching missing artwork just to check for a migration.
+ */
+export function backfillKnownRealmArt(realms: RealmNode[]) {
+  for (const realm of realms) {
+    if (backfillScanned.has(realm.seed)) continue;
+    backfillScanned.add(realm.seed);
+    void getLocalCachedArtAsync(realm.seed).then((cached) => {
+      if (cached) backfillCachedArt(realm.seed, buildRealmPrompt(realm), realm.title, cached);
+    });
+  }
 }
 
 function pump() {
@@ -161,7 +221,10 @@ function pump() {
 function waitForSharedResult(seed: string, leaseExpiresAt: number): Promise<string | null> {
   return new Promise((resolve) => {
     let settled = false;
-    let timer: number | undefined;
+    const timer = window.setTimeout(
+      () => settle(null),
+      Math.max(1_000, leaseExpiresAt - Date.now() + 750),
+    );
     const settle = (url: string | null) => {
       if (settled) return;
       settled = true;
@@ -173,8 +236,6 @@ function waitForSharedResult(seed: string, leaseExpiresAt: number): Promise<stri
       if (update.status === "ready") settle(update.url);
       if (update.status === "failed") settle(null);
     });
-    const retryIn = Math.max(1_000, leaseExpiresAt - Date.now() + 750);
-    timer = window.setTimeout(() => settle(null), retryIn);
   });
 }
 
@@ -210,7 +271,14 @@ async function claimAndGenerate(
   signal: AbortSignal | undefined,
   title: string,
 ): Promise<string> {
-  const claim = await claimSharedArt({ seed, title, promptHash: hashString(prompt).toString(36) });
+  // A browser extension, local network, or an in-progress Worker deploy can
+  // temporarily make the shared service unavailable. The game must still be
+  // playable: create and retain local art, then backfill on a later visit.
+  const claim = await claimSharedArt({
+    seed,
+    title,
+    promptHash: hashString(prompt).toString(36),
+  }).catch(() => null);
   if (!claim) {
     updateJob(seed, { status: "painting", startedAt: Date.now() });
     return generateLocally(seed, prompt, signal);
@@ -245,10 +313,16 @@ async function claimAndGenerate(
   });
   try {
     const final = await generateLocally(seed, prompt, signal);
-    const sharedUrl = await completeSharedArt(seed, claim.leaseId, final);
-    saveLocalArt(seed, sharedUrl);
-    notifyFrameListeners(seed, sharedUrl, true);
-    return sharedUrl;
+    try {
+      const sharedUrl = await completeSharedArt(seed, claim.leaseId, final);
+      saveLocalArt(seed, sharedUrl);
+      notifyFrameListeners(seed, sharedUrl, true);
+      return sharedUrl;
+    } catch {
+      // `generateLocally` already saved the final data URL. Do not hide a
+      // finished painting merely because its shared upload failed.
+      return final;
+    }
   } catch (error) {
     await failSharedArt(seed, claim.leaseId).catch(() => {});
     throw error;
@@ -265,6 +339,7 @@ export function ensureRealmArt(
 ): Promise<string> {
   const cached = getCachedArt(seed);
   if (cached) {
+    backfillCachedArt(seed, prompt, title, cached);
     onFrame?.(cached, true);
     return Promise.resolve(cached);
   }
@@ -279,21 +354,37 @@ export function ensureRealmArt(
   const task = new Promise<string>((resolve, reject) => {
     const run = () => {
       active++;
-      void getCachedArtAsync(seed)
-        .then((alreadyCached) => {
-          if (alreadyCached) {
-            notifyFrameListeners(seed, alreadyCached, true);
-            return alreadyCached;
+      // Do not start a foreground request with a network availability probe.
+      // A blocked Worker used to leave this promise pending forever, so the
+      // loading screen never progressed. Check this browser's cache first;
+      // `claimAndGenerate` then makes the single bounded shared-world request.
+      void getLocalCachedArtAsync(seed)
+        .then((localArt) => {
+          if (localArt) {
+            backfillCachedArt(seed, prompt, title, localArt);
+            notifyFrameListeners(seed, localArt, true);
+            return localArt;
           }
           return claimAndGenerate(seed, prompt, signal, title);
         })
-        .then(resolve, reject)
+        .then(resolve, (error) => {
+          // Keep the job long enough for the screen to explain what happened
+          // and let the traveller retry; the old flow removed it immediately,
+          // leaving a permanent-looking "Contacting painter" screen.
+          updateJob(seed, {
+            status: "failed",
+            error: classifyGenerationError(error),
+          });
+          reject(error);
+        })
         .finally(() => {
           active--;
           inflight.delete(seed);
           frameListeners.delete(seed);
-          jobs.delete(seed);
-          emit();
+          if (jobs.get(seed)?.status !== "failed") {
+            jobs.delete(seed);
+            emit();
+          }
           pump();
         });
     };

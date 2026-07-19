@@ -21,4 +21,4 @@ npx wrangler dev --local --config worker/wrangler.jsonc
 npm run dev
 ```
 
-The frontend uses `VITE_WORLD_API_URL` when set; otherwise development defaults to `http://127.0.0.1:8787`.
+The frontend's normal default is the deployed Worker URL in `src/lib/worldConfig.ts`. To point a local frontend at this local Worker, create `.env.local` in the repository root with `VITE_WORLD_API_URL=http://127.0.0.1:8787`.

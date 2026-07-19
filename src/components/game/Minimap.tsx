@@ -27,9 +27,11 @@ function classifyBody(r: RealmNode): Body {
 export function Minimap({
   state,
   onJump,
+  onOpenAtlas,
 }: {
   state: AdventureState;
   onJump: (realmId: string) => void;
+  onOpenAtlas: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -186,8 +188,18 @@ export function Minimap({
     >
       <div className="minimap-cosmos" aria-hidden />
       <div className="relative z-30 flex items-center justify-between px-3 pt-2">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
-          star chart
+        <div className="flex items-center gap-2">
+          <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
+            star chart
+          </div>
+          <button
+            type="button"
+            onClick={onOpenAtlas}
+            className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-white/65 transition hover:bg-white/10 hover:text-white"
+            aria-label={`Open atlas with ${state.visitedRealmIds.length} discovered worlds`}
+          >
+            atlas
+          </button>
         </div>
         <div className="flex items-center gap-2" ref={menuRef}>
 

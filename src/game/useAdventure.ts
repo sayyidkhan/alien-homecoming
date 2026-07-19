@@ -3,6 +3,7 @@ import type { AdventureState, HomeEcho, Portal, RealmConnection, RealmNode } fro
 import { loadAdventure, saveAdventure, clearAdventure } from "./storage";
 import { ECHO_LIBRARY, planRealm, planStartingRealm, STARTING_REALM_ID } from "./realmPlanner";
 import { hashString } from "./seed";
+import { backfillKnownRealmArt } from "@/lib/realmArtCache";
 
 const WAY_HOME_PORTAL_ID = "portal_way_home";
 const REAL_HOME_REALM_ID = "realm_home";
@@ -83,6 +84,11 @@ export function useAdventure() {
       return () => window.clearTimeout(t);
     }
   }, [state]);
+
+  // Move any pre-shared-world local art into Tigris without re-generating it.
+  useEffect(() => {
+    backfillKnownRealmArt(Object.values(state.realms));
+  }, [state.realms]);
 
   // Reveal way-home portal when echoes reach 3.
   useEffect(() => {

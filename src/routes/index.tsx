@@ -129,15 +129,12 @@ function GameInner() {
         ended={state.ended}
       />
       <DiscoveryToast message={toast} />
-      <Minimap state={state} onJump={handleJump} />
+      <Minimap
+        state={state}
+        onJump={handleJump}
+        onOpenAtlas={() => setAtlasOpen(true)}
+      />
       <PrewarmHUD currentSeed={currentRealm.seed} />
-      <button
-        type="button"
-        onClick={() => setAtlasOpen(true)}
-        className="absolute bottom-4 right-4 z-40 rounded-full border border-white/15 bg-black/45 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-white/80 backdrop-blur-md hover:bg-black/70 hover:text-white"
-      >
-        atlas · {state.visitedRealmIds.length} worlds
-      </button>
       <div className="pointer-events-none absolute bottom-4 left-4 z-40 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/45 backdrop-blur-md">
         {APP_RELEASE}
       </div>
