@@ -68,11 +68,13 @@ Player progression never goes through this service; it remains in the browser.
 The D1 database is configured in `worker/wrangler.jsonc`. Before the first Worker deploy, create a Tigris bucket named `alien-homecoming-art`, then add its S3 credentials as Worker secrets:
 
 ```bash
-npx wrangler secret put TIGRIS_ACCESS_KEY_ID --config worker/wrangler.jsonc
-npx wrangler secret put TIGRIS_SECRET_ACCESS_KEY --config worker/wrangler.jsonc
+npx wrangler secret put TIGRIS_STORAGE_ACCESS_KEY_ID --config worker/wrangler.jsonc
+npx wrangler secret put TIGRIS_STORAGE_SECRET_ACCESS_KEY --config worker/wrangler.jsonc
 npx wrangler deploy --config worker/wrangler.jsonc
 ```
 
 After deployment, set `VITE_WORLD_API_URL` in Lovable to the Worker URL printed by Wrangler (for example, `https://alien-homecoming-universe.<account>.workers.dev`). This is a public endpoint URL, not a secret. Realm art is fetched from the Worker before a device invokes image generation, while IndexedDB remains a local speed cache.
+
+Use `.env.example` for the public Lovable/Vite value. Tigris credential names and a local Worker template are in `worker/.dev.vars.example`; do not put those credentials in a `VITE_*` variable, because Vite exposes those to browsers.
 
 For a future production hardening pass, validate the image-generation lease in `/api/generate-realm` server-side. The current client-side lease flow prevents normal-player races, but a public no-login MVP can still be bypassed by a malicious direct API caller.

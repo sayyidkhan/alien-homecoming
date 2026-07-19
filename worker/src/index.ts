@@ -4,11 +4,11 @@ import { DurableObject } from "cloudflare:workers";
 interface Env {
   DB: D1Database;
   ART_COORDINATOR: DurableObjectNamespace<SharedWorld>;
-  TIGRIS_ENDPOINT: string;
+  TIGRIS_STORAGE_ENDPOINT: string;
   TIGRIS_BUCKET: string;
   TIGRIS_REGION?: string;
-  TIGRIS_ACCESS_KEY_ID: string;
-  TIGRIS_SECRET_ACCESS_KEY: string;
+  TIGRIS_STORAGE_ACCESS_KEY_ID: string;
+  TIGRIS_STORAGE_SECRET_ACCESS_KEY: string;
 }
 
 type ArtJob = {
@@ -90,18 +90,18 @@ function decodeDataUrl(dataUrl: string) {
 }
 
 function tigrisUrl(env: Env, objectKey: string) {
-  const endpoint = env.TIGRIS_ENDPOINT.replace(/\/$/, "");
+  const endpoint = env.TIGRIS_STORAGE_ENDPOINT.replace(/\/$/, "");
   const path = objectKey.split("/").map(encodeURIComponent).join("/");
   return `${endpoint}/${encodeURIComponent(env.TIGRIS_BUCKET)}/${path}`;
 }
 
 function tigrisClient(env: Env) {
-  if (!env.TIGRIS_ACCESS_KEY_ID || !env.TIGRIS_SECRET_ACCESS_KEY) {
+  if (!env.TIGRIS_STORAGE_ACCESS_KEY_ID || !env.TIGRIS_STORAGE_SECRET_ACCESS_KEY) {
     throw new Error("Tigris credentials are not configured");
   }
   return new AwsClient({
-    accessKeyId: env.TIGRIS_ACCESS_KEY_ID,
-    secretAccessKey: env.TIGRIS_SECRET_ACCESS_KEY,
+    accessKeyId: env.TIGRIS_STORAGE_ACCESS_KEY_ID,
+    secretAccessKey: env.TIGRIS_STORAGE_SECRET_ACCESS_KEY,
     service: "s3",
     region: env.TIGRIS_REGION || "auto",
   });

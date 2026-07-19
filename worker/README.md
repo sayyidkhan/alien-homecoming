@@ -6,12 +6,12 @@ It provides a D1-backed global realm registry and job audit trail, a Durable Obj
 
 ```bash
 npx wrangler d1 execute alien-homecoming-universe --remote --config worker/wrangler.jsonc --file worker/migrations/0001_universe.sql
-npx wrangler secret put TIGRIS_ACCESS_KEY_ID --config worker/wrangler.jsonc
-npx wrangler secret put TIGRIS_SECRET_ACCESS_KEY --config worker/wrangler.jsonc
+npx wrangler secret put TIGRIS_STORAGE_ACCESS_KEY_ID --config worker/wrangler.jsonc
+npx wrangler secret put TIGRIS_STORAGE_SECRET_ACCESS_KEY --config worker/wrangler.jsonc
 npx wrangler deploy --config worker/wrangler.jsonc
 ```
 
-Create a private Tigris bucket called `alien-homecoming-art` before deploying, or update `TIGRIS_BUCKET` in `wrangler.jsonc`. The Worker proxies reads, so the bucket does not need to be public.
+Create a private Tigris bucket called `alien-homecoming-art` before deploying, or update `TIGRIS_BUCKET` in `wrangler.jsonc`. Non-secret endpoint and bucket settings live in `wrangler.jsonc`; local credentials belong in `worker/.dev.vars` (copy `worker/.dev.vars.example`). The Worker proxies reads, so the bucket does not need to be public. `https://iam.storage.dev` is only for Tigris account/IAM management and is not used by this Worker.
 
 For local development, run the worker and the Lovable frontend in separate terminals:
 
