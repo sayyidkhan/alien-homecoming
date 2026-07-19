@@ -1,8 +1,11 @@
-const configuredApiUrl = import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "");
+import { DEFAULT_WORLD_API_URL } from "./worldConfig";
+
+const configuredApiUrl =
+  import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "") ?? DEFAULT_WORLD_API_URL;
 
 // Local development uses Wrangler on this port. Production deliberately needs
 // an explicit URL so a preview never accidentally sends work to the wrong world.
-export const worldApiUrl = configuredApiUrl ?? (import.meta.env.DEV ? "http://127.0.0.1:8787" : "");
+export const worldApiUrl = configuredApiUrl || (import.meta.env.DEV ? "http://127.0.0.1:8787" : "");
 
 export type ArtClaim =
   | { status: "ready"; url: string }
