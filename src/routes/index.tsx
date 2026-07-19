@@ -7,6 +7,7 @@ import { HUD, DiscoveryToast } from "@/components/game/HUD";
 import { Transition } from "@/components/game/Transition";
 import { WorldAtlas } from "@/components/game/WorldAtlas";
 import { PrewarmHUD } from "@/components/game/PrewarmHUD";
+import { APP_RELEASE } from "@/lib/release";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -137,6 +138,9 @@ function GameInner() {
       >
         atlas · {state.visitedRealmIds.length} worlds
       </button>
+      <div className="pointer-events-none absolute bottom-4 left-4 z-40 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/45 backdrop-blur-md">
+        {APP_RELEASE}
+      </div>
       {atlasOpen && (
         <WorldAtlas
           state={state}
