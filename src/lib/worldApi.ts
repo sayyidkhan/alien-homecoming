@@ -1,8 +1,13 @@
-const configuredApiUrl = import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "");
+// This is a public Worker URL, not a credential. VITE_WORLD_API_URL remains an
+// override for previews or a future custom domain.
+const DEFAULT_WORLD_API_URL = "https://alien-homecoming-universe.sayyidkhan92.workers.dev";
+
+const configuredApiUrl =
+  import.meta.env.VITE_WORLD_API_URL?.replace(/\/$/, "") ?? DEFAULT_WORLD_API_URL;
 
 // Local development uses Wrangler on this port. Production deliberately needs
 // an explicit URL so a preview never accidentally sends work to the wrong world.
-export const worldApiUrl = configuredApiUrl ?? (import.meta.env.DEV ? "http://127.0.0.1:8787" : "");
+export const worldApiUrl = configuredApiUrl || (import.meta.env.DEV ? "http://127.0.0.1:8787" : "");
 
 export type ArtClaim =
   | { status: "ready"; url: string }
