@@ -71,7 +71,7 @@ function artPath(seed: string) {
 }
 
 function artKey(seed: string) {
-  return `realms/${encodeURIComponent(seed)}.png`;
+  return `realm-art/v1/${encodeURIComponent(seed)}.png`;
 }
 
 function publicArtUrl(request: Request, seed: string) {
