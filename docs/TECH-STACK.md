@@ -36,6 +36,9 @@
 | Device state | `localStorage`, IndexedDB | Player journey and a fast per-device art cache. |
 | Source/deploy workflow | GitHub + Lovable + Cloudflare | GitHub is source control; Lovable builds the frontend; Cloudflare deploys the Worker. |
 
+For the D1 tables, lease lifecycle, and Tigris object mapping, see the
+[shared-world database schema](DATABASE-SCHEMA.md).
+
 ## Shared-art lifecycle
 
 1. The game looks for an image in memory, `localStorage`, IndexedDB, then the shared Worker.

@@ -69,6 +69,7 @@ The migration tool handles filesystem/static images only. It never deletes sourc
 
 - [Deployment guide](DEPLOYMENT.md)
 - [Tech stack and architecture](docs/TECH-STACK.md)
+- [Shared-world database schema](docs/DATABASE-SCHEMA.md)
 - [Cloudflare Worker notes](worker/README.md)
 
 ## Development commands
