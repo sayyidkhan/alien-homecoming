@@ -55,7 +55,7 @@ npm run worker:deploy
 Check the deployed service:
 
 ```bash
-curl https://alien-homecoming-universe.shab-hacks.workers.dev/health
+curl https://alien-homecoming-universe.sayyidkhan92.workers.dev/health
 ```
 
 Expected response:
