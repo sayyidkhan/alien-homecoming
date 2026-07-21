@@ -6,8 +6,6 @@ import { Minimap } from "@/components/game/Minimap";
 import { HUD, DiscoveryToast } from "@/components/game/HUD";
 import { Transition } from "@/components/game/Transition";
 import { WorldAtlas } from "@/components/game/WorldAtlas";
-import { PrewarmHUD } from "@/components/game/PrewarmHUD";
-import { APP_RELEASE } from "@/lib/release";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -72,15 +70,17 @@ function GameInner() {
   const handleDiscovery = useCallback(
     (d: { id: string; kind: "home_echo" | "clue"; title: string; description: string }) => {
       collectDiscovery(d.id);
-      setToast(
-        d.kind === "home_echo" ? `Home Echo · ${d.title}` : d.title,
-      );
+      setToast(d.kind === "home_echo" ? `Home Echo · ${d.title}` : d.title);
     },
     [collectDiscovery],
   );
 
   const handlePortalActivate = useCallback(
-    (portal: { id: string; title: string; shape: { x: number; y: number; w: number; h: number } }) => {
+    (portal: {
+      id: string;
+      title: string;
+      shape: { x: number; y: number; w: number; h: number };
+    }) => {
       const targetX = Math.max(0.08, Math.min(0.92, portal.shape.x + portal.shape.w / 2));
       const targetY = Math.max(0.55, Math.min(0.84, portal.shape.y + portal.shape.h / 2 + 0.08));
       moveAlien(targetX, targetY);
@@ -101,11 +101,7 @@ function GameInner() {
   );
 
   if (!currentRealm) {
-    return (
-      <div className="flex h-screen items-center justify-center text-white/70">
-        Loading…
-      </div>
-    );
+    return <div className="flex h-screen items-center justify-center text-white/70">Loading…</div>;
   }
 
   return (
@@ -127,30 +123,14 @@ function GameInner() {
         echoes={state.homeEchoes}
         onReset={resetAdventure}
         ended={state.ended}
+        currentSeed={currentRealm.seed}
       />
       <DiscoveryToast message={toast} />
-      <Minimap
-        state={state}
-        onJump={handleJump}
-        onOpenAtlas={() => setAtlasOpen(true)}
-      />
-      <PrewarmHUD currentSeed={currentRealm.seed} />
-      <div className="pointer-events-none absolute bottom-4 left-4 z-40 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/45 backdrop-blur-md">
-        {APP_RELEASE}
-      </div>
+      <Minimap state={state} onJump={handleJump} onOpenAtlas={() => setAtlasOpen(true)} />
       {atlasOpen && (
-        <WorldAtlas
-          state={state}
-          onClose={() => setAtlasOpen(false)}
-          onJump={handleJump}
-        />
+        <WorldAtlas state={state} onClose={() => setAtlasOpen(false)} onJump={handleJump} />
       )}
-      {transitioning && (
-        <Transition
-          label={transitioning.label}
-          onDone={finishTransition}
-        />
-      )}
+      {transitioning && <Transition label={transitioning.label} onDone={finishTransition} />}
       {intro && <IntroOverlay />}
     </div>
   );
@@ -160,14 +140,12 @@ function IntroOverlay() {
   return (
     <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/55 backdrop-blur-sm">
       <div className="max-w-xl px-8 text-center intro-fade">
-        <div className="text-[10px] uppercase tracking-[0.5em] text-white/60">
-          a wandering
-        </div>
-        <h2 className="mt-3 font-serif text-4xl leading-tight text-white">
-          Lost Between Worlds
-        </h2>
+        <div className="text-[10px] uppercase tracking-[0.5em] text-white/60">a wandering</div>
+        <h2 className="mt-3 font-serif text-4xl leading-tight text-white">Lost Between Worlds</h2>
         <p className="mt-4 text-sm leading-relaxed text-white/75">
-          Click a place on the stone to walk. Click a doorway, telescope, tree of stars — anything that glows — to cross into another universe. Find three home echoes. Draw your own map back.
+          Click a place on the stone to walk. Click a doorway, telescope, tree of stars — anything
+          that glows — to cross into another universe. Find three home echoes. Draw your own map
+          back.
         </p>
       </div>
     </div>

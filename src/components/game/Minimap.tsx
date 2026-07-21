@@ -19,8 +19,7 @@ function classifyBody(r: RealmNode): Body {
   if (r.special === "real_home") return "sun-home";
   if (r.special === "false_home") return "blackhole";
   if (r.special === "start") return "sun-start";
-  if (r.discoveries.some((d) => d.kind === "home_echo" && d.found))
-    return "star-echo";
+  if (r.discoveries.some((d) => d.kind === "home_echo" && d.found)) return "star-echo";
   return "star";
 }
 
@@ -34,7 +33,9 @@ export function Minimap({
   onOpenAtlas: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [chartSize, setChartSize] = useState(280);
   const [mode, setMode] = useState<ViewMode>("2d");
   // Static tilt angle for 3D; user can drag to rotate.
   const [yaw, setYaw] = useState(-0.4);
@@ -43,6 +44,9 @@ export function Minimap({
   const [menuOpen, setMenuOpen] = useState(false);
   const dragRef = useRef<{ x: number; startYaw: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const resizeRef = useRef<{ x: number; y: number; startSize: number; moved: boolean } | null>(
+    null,
+  );
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,9 +58,10 @@ export function Minimap({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-
   const layout = useMemo(() => positionNodes(state), [state]);
-  const size = fullscreen ? undefined : expanded ? 520 : 240;
+  const size = fullscreen ? undefined : chartSize;
+  const chartAtMinSize = chartSize <= 280;
+  const chartAtMaxSize = fullscreen;
   const svgSize = 400;
 
   const depthMap = useMemo(() => computeDepths(state), [state]);
@@ -103,10 +108,7 @@ export function Minimap({
   }, [mode, yaw]);
 
   const projected = useMemo(() => {
-    const out: Record<
-      string,
-      { x: number; y: number; scale: number; z: number }
-    > = {};
+    const out: Record<string, { x: number; y: number; scale: number; z: number }> = {};
     for (const [id, p] of Object.entries(layout)) {
       const depth = depthMap[id] ?? 0;
       const lift = mode === "3d" ? -depth * 22 : 0;
@@ -127,11 +129,13 @@ export function Minimap({
   const ringSquash = mode === "3d" ? Math.cos(0.95) : 1;
 
   const drawOrder = useMemo(() => {
-    return Object.values(state.realms).slice().sort((a, b) => {
-      const za = projected[a.id]?.z ?? 0;
-      const zb = projected[b.id]?.z ?? 0;
-      return zb - za;
-    });
+    return Object.values(state.realms)
+      .slice()
+      .sort((a, b) => {
+        const za = projected[a.id]?.z ?? 0;
+        const zb = projected[b.id]?.z ?? 0;
+        return zb - za;
+      });
   }, [state.realms, projected]);
 
   // Drag to rotate (3D) or pan (both modes with shift/middle, or when zoomed)
@@ -175,51 +179,138 @@ export function Minimap({
     setPan({ x: 0, y: 0 });
     setYaw(-0.4);
   };
+  const setChartExpanded = (nextExpanded: boolean) => {
+    setExpanded(nextExpanded);
+    setChartSize(nextExpanded ? 440 : 280);
+  };
+  const onResizePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeRef.current = { x: e.clientX, y: e.clientY, startSize: chartSize, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onResizePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!resizeRef.current) return;
+    const { x, y, startSize } = resizeRef.current;
+    if (Math.abs(x - e.clientX) + Math.abs(y - e.clientY) > 3) resizeRef.current.moved = true;
+    const nextSize = Math.round(
+      Math.min(560, Math.max(280, startSize + (x - e.clientX + y - e.clientY) / 2)),
+    );
+    setChartSize(nextSize);
+    setExpanded(nextSize >= 360);
+  };
+  const onResizePointerUp = () => {
+    if (resizeRef.current && !resizeRef.current.moved) {
+      if (chartSize >= 440) {
+        setFullscreen(true);
+      } else {
+        setChartSize(440);
+        setExpanded(true);
+      }
+    }
+    resizeRef.current = null;
+  };
 
   const viewSize = svgSize / zoom;
   const viewX = (svgSize - viewSize) / 2 + pan.x;
   const viewY = (svgSize - viewSize) / 2 + pan.y;
 
-
   return (
-    <div
-      className={`minimap ${expanded ? "minimap-expanded" : ""} ${fullscreen ? "minimap-fullscreen" : ""}`}
-      style={fullscreen ? undefined : { width: size, height: size }}
-    >
-      <div className="minimap-cosmos" aria-hidden />
-      <div className="relative z-30 flex items-center justify-between px-3 pt-2">
-        <div className="flex items-center gap-2">
-          <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">
-            star chart
-          </div>
+    <>
+      <button
+        type="button"
+        className={`minimap-launcher ${collapsed ? "" : "minimap-launcher-hidden"}`}
+        onClick={() => setCollapsed(false)}
+        aria-label={`Open star chart with ${state.visitedRealmIds.length} discovered worlds`}
+      >
+        <span className="minimap-launcher-star" aria-hidden>
+          ✦
+        </span>
+        <span>star chart</span>
+        <span className="minimap-launcher-count">{state.visitedRealmIds.length}</span>
+      </button>
+      <div
+        className={`minimap ${expanded ? "minimap-expanded" : ""} ${fullscreen ? "minimap-fullscreen" : ""} ${collapsed && !fullscreen ? "minimap-collapsed" : ""}`}
+        style={fullscreen ? undefined : { width: size, height: size }}
+      >
+        <div className="minimap-cosmos" aria-hidden />
+        <div className="minimap-window-controls" aria-label="Star chart window controls">
           <button
             type="button"
-            onClick={onOpenAtlas}
-            className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-white/65 transition hover:bg-white/10 hover:text-white"
-            aria-label={`Open atlas with ${state.visitedRealmIds.length} discovered worlds`}
+            className="minimap-window-control minimap-window-close"
+            onClick={() => {
+              setFullscreen(false);
+              setExpanded(false);
+              setChartSize(280);
+              setCollapsed(true);
+            }}
+            aria-label="Close star chart"
+            title="Close chart"
           >
-            atlas
+            ×
+          </button>
+          <button
+            type="button"
+            className="minimap-window-control minimap-window-minimize"
+            onClick={() => {
+              if (fullscreen) {
+                setFullscreen(false);
+                setChartSize(440);
+                setExpanded(true);
+              } else if (chartSize > 440) {
+                setChartSize(440);
+                setExpanded(true);
+              } else {
+                setChartExpanded(false);
+              }
+            }}
+            aria-label="Minimize star chart"
+            title={
+              chartAtMinSize && !fullscreen ? "Smallest chart size" : "Return to previous size"
+            }
+            disabled={chartAtMinSize && !fullscreen}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="minimap-window-control minimap-window-expand"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onPointerCancel={onResizePointerUp}
+            aria-label="Expand star chart; drag to resize"
+            title={
+              chartAtMaxSize
+                ? "Largest chart size"
+                : chartSize >= 440
+                  ? "Open fullscreen chart"
+                  : "Click to expand, drag to resize"
+            }
+            disabled={chartAtMaxSize}
+          >
+            +
           </button>
         </div>
-        <div className="flex items-center gap-2" ref={menuRef}>
 
-          {(fullscreen || expanded) ? (
-            <ControlBar
-              mode={mode}
-              setMode={setMode}
-              setZoom={setZoom}
-              resetView={resetView}
-              expanded={expanded}
-              fullscreen={fullscreen}
-              setExpanded={setExpanded}
-              setFullscreen={setFullscreen}
-            />
-          ) : (
+        <div className="relative z-30 flex items-center justify-between pl-[68px] pr-3 pt-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/70">star chart</div>
+            <button
+              type="button"
+              onClick={onOpenAtlas}
+              className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-white/65 transition hover:bg-white/10 hover:text-white"
+              aria-label={`Open atlas with ${state.visitedRealmIds.length} discovered worlds`}
+            >
+              atlas
+            </button>
+          </div>
+          <div className="flex items-center gap-2" ref={menuRef}>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-label="chart controls"
+                aria-label="Chart controls"
                 aria-expanded={menuOpen}
                 className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
               >
@@ -231,231 +322,222 @@ export function Minimap({
                   role="menu"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <ControlBar
-                    mode={mode}
-                    setMode={setMode}
-                    setZoom={setZoom}
-                    resetView={resetView}
-                    expanded={expanded}
-                    fullscreen={fullscreen}
-                    setExpanded={(v) => { setExpanded(v); setMenuOpen(false); }}
-                    setFullscreen={(v) => { setFullscreen(v); setMenuOpen(false); }}
-                    stacked
-                  />
+                  <ControlBar mode={mode} setMode={setMode} resetView={resetView} stacked />
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      <svg
-        viewBox={`${viewX} ${viewY} ${viewSize} ${viewSize}`}
-        className="relative z-10 w-full flex-1 touch-none"
-        style={{ cursor: panRef.current ? "grabbing" : mode === "3d" || zoom > 1.01 ? "grab" : "default" }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        <svg
+          viewBox={`${viewX} ${viewY} ${viewSize} ${viewSize}`}
+          className="relative z-10 w-full flex-1 touch-none"
+          style={{
+            cursor: panRef.current ? "grabbing" : mode === "3d" || zoom > 1.01 ? "grab" : "default",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          onWheel={onWheel}
+        >
+          <defs>
+            {/* Sun (yellow-white) */}
+            <radialGradient id="mm-sun-home" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fffbe6" />
+              <stop offset="40%" stopColor="#ffd76a" />
+              <stop offset="100%" stopColor="rgba(255,180,60,0)" />
+            </radialGradient>
+            {/* Blue sun (start) */}
+            <radialGradient id="mm-sun-start" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ecf5ff" />
+              <stop offset="40%" stopColor="#8ab7ff" />
+              <stop offset="100%" stopColor="rgba(80,120,255,0)" />
+            </radialGradient>
+            {/* Echo star (warm) */}
+            <radialGradient id="mm-star-echo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fff2d6" />
+              <stop offset="45%" stopColor="#ffbf7a" />
+              <stop offset="100%" stopColor="rgba(255,150,80,0)" />
+            </radialGradient>
+            {/* Ordinary star (pink-violet) */}
+            <radialGradient id="mm-star" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ffe4f0" />
+              <stop offset="45%" stopColor="#e7a8c9" />
+              <stop offset="100%" stopColor="rgba(200,120,180,0)" />
+            </radialGradient>
+            {/* Black hole accretion ring */}
+            <radialGradient id="mm-blackhole" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#000000" />
+              <stop offset="55%" stopColor="#000000" />
+              <stop offset="70%" stopColor="#c894ff" />
+              <stop offset="85%" stopColor="rgba(200,148,255,0.3)" />
+              <stop offset="100%" stopColor="rgba(200,148,255,0)" />
+            </radialGradient>
+            <radialGradient id="mm-core" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="rgba(255,240,210,0.4)" />
+              <stop offset="60%" stopColor="rgba(180,140,255,0.08)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+            </radialGradient>
+            <filter id="mm-glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="3" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-        onPointerLeave={onPointerUp}
-        onWheel={onWheel}
+          {/* backdrop stars */}
+          {starField.map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={s.o} />
+          ))}
 
-      >
-        <defs>
-          {/* Sun (yellow-white) */}
-          <radialGradient id="mm-sun-home" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fffbe6" />
-            <stop offset="40%" stopColor="#ffd76a" />
-            <stop offset="100%" stopColor="rgba(255,180,60,0)" />
-          </radialGradient>
-          {/* Blue sun (start) */}
-          <radialGradient id="mm-sun-start" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#ecf5ff" />
-            <stop offset="40%" stopColor="#8ab7ff" />
-            <stop offset="100%" stopColor="rgba(80,120,255,0)" />
-          </radialGradient>
-          {/* Echo star (warm) */}
-          <radialGradient id="mm-star-echo" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fff2d6" />
-            <stop offset="45%" stopColor="#ffbf7a" />
-            <stop offset="100%" stopColor="rgba(255,150,80,0)" />
-          </radialGradient>
-          {/* Ordinary star (pink-violet) */}
-          <radialGradient id="mm-star" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#ffe4f0" />
-            <stop offset="45%" stopColor="#e7a8c9" />
-            <stop offset="100%" stopColor="rgba(200,120,180,0)" />
-          </radialGradient>
-          {/* Black hole accretion ring */}
-          <radialGradient id="mm-blackhole" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#000000" />
-            <stop offset="55%" stopColor="#000000" />
-            <stop offset="70%" stopColor="#c894ff" />
-            <stop offset="85%" stopColor="rgba(200,148,255,0.3)" />
-            <stop offset="100%" stopColor="rgba(200,148,255,0)" />
-          </radialGradient>
-          <radialGradient id="mm-core" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(255,240,210,0.4)" />
-            <stop offset="60%" stopColor="rgba(180,140,255,0.08)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-          </radialGradient>
-          <filter id="mm-glow" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="3" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+          {/* galactic core */}
+          <ellipse cx={200} cy={200} rx={90} ry={90 * ringSquash} fill="url(#mm-core)" />
 
-        {/* backdrop stars */}
-        {starField.map((s, i) => (
-          <circle
-            key={i}
-            cx={s.x}
-            cy={s.y}
-            r={s.r}
-            fill="#ffffff"
-            opacity={s.o}
-          />
-        ))}
-
-        {/* galactic core */}
-        <ellipse
-          cx={200}
-          cy={200}
-          rx={90}
-          ry={90 * ringSquash}
-          fill="url(#mm-core)"
-        />
-
-        {/* orbital rings */}
-        {orbitRadii.map((r) => (
-          <ellipse
-            key={r}
-            cx={200}
-            cy={200}
-            rx={r}
-            ry={r * ringSquash}
-            fill="none"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth={0.6}
-            strokeDasharray="1 3"
-          />
-        ))}
-
-        {/* connections */}
-        {state.connections.map((c, i) => {
-          const a = projected[c.fromRealmId];
-          const b = projected[c.toRealmId];
-          if (!a || !b) return null;
-          return (
-            <line
-              key={i}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke="rgba(200,180,255,0.28)"
-              strokeWidth={0.8}
-              strokeDasharray="2 4"
+          {/* orbital rings */}
+          {orbitRadii.map((r) => (
+            <ellipse
+              key={r}
+              cx={200}
+              cy={200}
+              rx={r}
+              ry={r * ringSquash}
+              fill="none"
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth={0.6}
+              strokeDasharray="1 3"
             />
-          );
-        })}
+          ))}
 
-        {/* 3D drop-lines */}
-        {mode === "3d" &&
-          drawOrder.map((r) => {
-            const p = projected[r.id];
-            if (!p) return null;
-            const g = project(layout[r.id].x, layout[r.id].y, 0);
+          {/* connections */}
+          {state.connections.map((c, i) => {
+            const a = projected[c.fromRealmId];
+            const b = projected[c.toRealmId];
+            if (!a || !b) return null;
             return (
               <line
-                key={`drop-${r.id}`}
-                x1={p.x}
-                y1={p.y}
-                x2={g.x}
-                y2={g.y}
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={0.5}
-                strokeDasharray="1 2"
+                key={i}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="rgba(200,180,255,0.28)"
+                strokeWidth={0.8}
+                strokeDasharray="2 4"
               />
             );
           })}
 
-        {/* nodes */}
-        {drawOrder.map((r, idx) => {
-          const pos = projected[r.id];
-          if (!pos) return null;
-          const body = classifyBody(r);
-          const isCurrent = r.id === state.currentRealmId;
-          const hasUnfound = r.discoveries.some((d) => !d.found);
-          const labelBelow = idx % 2 === 0;
-          const labelY = labelBelow ? 22 : -16;
-          const title = truncate(r.title, fullscreen ? 26 : expanded ? 20 : 14);
-          const fontSize = (fullscreen ? 7 : 6) / Math.max(0.75, Math.min(zoom, 1.6));
-
-          const labelW = Math.max(44, title.length * (fontSize * 0.72));
-          const s = pos.scale;
-
-          return (
-            <g
-              key={r.id}
-              transform={`translate(${pos.x}, ${pos.y}) scale(${s})`}
-              className="cursor-pointer minimap-node"
-              onClick={() => onJump(r.id)}
-              opacity={0.45 + 0.55 * s}
-            >
-              <CelestialBody body={body} seed={r.id} />
-              {isCurrent && (
-                <circle
-                  r={13}
-                  fill="none"
-                  strokeWidth={1}
-                  strokeDasharray="2 3"
-                  className="minimap-current"
-                />
-              )}
-              {hasUnfound && (
-                <circle r={1.5} cx={7} cy={-7} fill="#fff" opacity={0.95} />
-              )}
-              <g transform={`translate(0, ${labelY})`}>
-                <rect
-                  x={-labelW / 2}
-                  y={-fontSize + 1}
-                  width={labelW}
-                  height={fontSize + 4}
-                  rx={(fontSize + 4) / 2}
-                  fill="rgba(8,4,20,0.88)"
-                  stroke="rgba(255,255,255,0.12)"
+          {/* 3D drop-lines */}
+          {mode === "3d" &&
+            drawOrder.map((r) => {
+              const p = projected[r.id];
+              if (!p) return null;
+              const g = project(layout[r.id].x, layout[r.id].y, 0);
+              return (
+                <line
+                  key={`drop-${r.id}`}
+                  x1={p.x}
+                  y1={p.y}
+                  x2={g.x}
+                  y2={g.y}
+                  stroke="rgba(255,255,255,0.1)"
                   strokeWidth={0.5}
+                  strokeDasharray="1 2"
                 />
-                <text
-                  textAnchor="middle"
-                  y={2.8}
-                  fontSize={fontSize}
-                  fill="rgba(255,255,255,0.95)"
-                  fontFamily="system-ui, sans-serif"
-                  letterSpacing="0.02em"
-                >
-                  {title}
-                </text>
+              );
+            })}
+
+          {/* nodes */}
+          {drawOrder.map((r, idx) => {
+            const pos = projected[r.id];
+            if (!pos) return null;
+            const body = classifyBody(r);
+            const isCurrent = r.id === state.currentRealmId;
+            const hasUnfound = r.discoveries.some((d) => !d.found);
+            const labelBelow = idx % 2 === 0;
+            const labelY = labelBelow ? 22 : -16;
+            const title = truncate(r.title, fullscreen ? 26 : expanded ? 20 : 14);
+            const fontSize = (fullscreen ? 7 : 6) / Math.max(0.75, Math.min(zoom, 1.6));
+
+            const labelW = Math.max(44, title.length * (fontSize * 0.72));
+            const s = pos.scale;
+            const showLabel = fullscreen || expanded || isCurrent;
+
+            return (
+              <g
+                key={r.id}
+                transform={`translate(${pos.x}, ${pos.y}) scale(${s})`}
+                className="cursor-pointer minimap-node"
+                onClick={() => onJump(r.id)}
+                opacity={0.45 + 0.55 * s}
+              >
+                <title>{r.title}</title>
+                <CelestialBody body={body} seed={r.id} />
+                {isCurrent && (
+                  <circle
+                    r={13}
+                    fill="none"
+                    strokeWidth={1}
+                    strokeDasharray="2 3"
+                    className="minimap-current"
+                  />
+                )}
+                {hasUnfound && <circle r={1.5} cx={7} cy={-7} fill="#fff" opacity={0.95} />}
+                {showLabel && (
+                  <g transform={`translate(0, ${labelY})`}>
+                    <rect
+                      x={-labelW / 2}
+                      y={-fontSize + 1}
+                      width={labelW}
+                      height={fontSize + 4}
+                      rx={(fontSize + 4) / 2}
+                      fill="rgba(8,4,20,0.88)"
+                      stroke="rgba(255,255,255,0.12)"
+                      strokeWidth={0.5}
+                    />
+                    <text
+                      textAnchor="middle"
+                      y={2.8}
+                      fontSize={fontSize}
+                      fill="rgba(255,255,255,0.95)"
+                      fontFamily="system-ui, sans-serif"
+                      letterSpacing="0.02em"
+                    >
+                      {title}
+                    </text>
+                  </g>
+                )}
               </g>
-            </g>
-          );
-        })}
-      </svg>
-      <div className="relative z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-[11px] uppercase tracking-[0.18em] text-white/75">
-        <span className="flex items-center gap-1.5"><Dot color="#8ab7ff" size={10} /> start</span>
-        <span className="flex items-center gap-1.5"><Dot color="#e7a8c9" size={10} /> star</span>
-        <span className="flex items-center gap-1.5"><Dot color="#ffbf7a" size={10} /> echo</span>
-        <span className="flex items-center gap-1.5"><Dot color="#c894ff" ring size={10} /> hole</span>
-        <span className="flex items-center gap-1.5"><Dot color="#ffd76a" size={10} /> home</span>
-        {mode === "3d" && (
-          <span className="opacity-60 normal-case tracking-normal">· drag to rotate</span>
+            );
+          })}
+        </svg>
+        {(fullscreen || expanded) && (
+          <div className="relative z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-[11px] uppercase tracking-[0.18em] text-white/75">
+            <span className="flex items-center gap-1.5">
+              <Dot color="#8ab7ff" size={10} /> start
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot color="#e7a8c9" size={10} /> star
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot color="#ffbf7a" size={10} /> echo
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot color="#c894ff" ring size={10} /> hole
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot color="#ffd76a" size={10} /> home
+            </span>
+            {mode === "3d" && (
+              <span className="opacity-60 normal-case tracking-normal">· drag to rotate</span>
+            )}
+          </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -465,12 +547,7 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
     case "sun-home":
       return (
         <>
-          <circle
-            r={14}
-            fill="url(#mm-sun-home)"
-            filter="url(#mm-glow)"
-            className="sun-halo"
-          />
+          <circle r={14} fill="url(#mm-sun-home)" filter="url(#mm-glow)" className="sun-halo" />
           <circle r={6} fill="#fffbe6" />
           {/* corona rays — slowly drift */}
           <g className="sun-rays">
@@ -502,13 +579,7 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
             className="sun-halo-soft"
           />
           <circle r={5.5} fill="#ecf5ff" />
-          <circle
-            r={5.5}
-            fill="none"
-            stroke="#a8c5ff"
-            strokeWidth={0.8}
-            opacity={0.9}
-          />
+          <circle r={5.5} fill="none" stroke="#a8c5ff" strokeWidth={0.8} opacity={0.9} />
           {/* faint rays drifting opposite direction */}
           <g className="sun-rays-reverse">
             {Array.from({ length: 6 }).map((_, i) => {
@@ -549,12 +620,7 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
     case "star":
       return (
         <>
-          <circle
-            r={10}
-            fill="url(#mm-star)"
-            filter="url(#mm-glow)"
-            className="sun-halo-soft"
-          />
+          <circle r={10} fill="url(#mm-star)" filter="url(#mm-glow)" className="sun-halo-soft" />
           <circle r={4} fill="#ffe4f0" />
           <path
             d="M0,-6 L0.7,-0.7 L6,0 L0.7,0.7 L0,6 L-0.7,0.7 L-6,0 L-0.7,-0.7 Z"
@@ -568,8 +634,22 @@ function CelestialBody({ body, seed }: { body: Body; seed: string }) {
         <>
           {/* accretion disk spins slowly */}
           <g className="blackhole-disk">
-            <ellipse rx={13} ry={4.5} fill="none" stroke="#c894ff" strokeWidth={1.2} opacity={0.85} />
-            <ellipse rx={13} ry={4.5} fill="none" stroke="#f5d6ff" strokeWidth={0.4} opacity={0.9} />
+            <ellipse
+              rx={13}
+              ry={4.5}
+              fill="none"
+              stroke="#c894ff"
+              strokeWidth={1.2}
+              opacity={0.85}
+            />
+            <ellipse
+              rx={13}
+              ry={4.5}
+              fill="none"
+              stroke="#f5d6ff"
+              strokeWidth={0.4}
+              opacity={0.9}
+            />
           </g>
           <circle r={11} fill="url(#mm-blackhole)" opacity={0.9} />
           <circle r={4.5} fill="#000" />
@@ -583,27 +663,15 @@ type ViewModeType = ViewMode;
 function ControlBar({
   mode,
   setMode,
-  setZoom,
   resetView,
-  expanded,
-  fullscreen,
-  setExpanded,
-  setFullscreen,
   stacked = false,
 }: {
   mode: ViewModeType;
   setMode: (m: ViewModeType) => void;
-  setZoom: (updater: (z: number) => number) => void;
   resetView: () => void;
-  expanded: boolean;
-  fullscreen: boolean;
-  setExpanded: (v: boolean) => void;
-  setFullscreen: (v: boolean) => void;
   stacked?: boolean;
 }) {
-  const wrap = stacked
-    ? "flex flex-col items-stretch gap-2"
-    : "flex items-center gap-2";
+  const wrap = stacked ? "flex flex-col items-stretch gap-2" : "flex items-center gap-2";
   return (
     <div className={wrap}>
       <div className="flex overflow-hidden rounded-full border border-white/15 text-[9px] uppercase tracking-[0.2em]">
@@ -626,69 +694,29 @@ function ControlBar({
           3d
         </button>
       </div>
-      <div className="flex overflow-hidden rounded-full border border-white/15 text-[10px] tracking-[0.1em] text-white/70">
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}
-          aria-label="zoom out"
-          className="flex-1 px-2 py-0.5 hover:bg-white/10 hover:text-white"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
-          aria-label="zoom in"
-          className="flex-1 border-l border-white/15 px-2 py-0.5 hover:bg-white/10 hover:text-white"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={resetView}
-          aria-label="recenter on start"
-          className="flex-1 border-l border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white"
-        >
-          home
-        </button>
-      </div>
-      {!fullscreen && (
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
-        >
-          {expanded ? "shrink" : "expand"}
-        </button>
-      )}
       <button
         type="button"
-        onClick={() => setFullscreen(!fullscreen)}
-        aria-label={fullscreen ? "exit fullscreen" : "fullscreen"}
-        className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 hover:bg-white/10 hover:text-white"
+        onClick={resetView}
+        aria-label="Recenter on start"
+        className="rounded-full border border-white/15 px-3 py-1 text-[9px] uppercase tracking-[0.2em] text-white/70 hover:bg-white/10 hover:text-white"
       >
-        {fullscreen ? "close" : "full"}
+        home
       </button>
     </div>
   );
 }
 
-
-function Dot({
-  color,
-  ring,
-  size = 8,
-}: {
-  color: string;
-  ring?: boolean;
-  size?: number;
-}) {
+function Dot({ color, ring, size = 8 }: { color: string; ring?: boolean; size?: number }) {
   const style = ring
-    ? { background: "#000", boxShadow: `0 0 0 1.5px ${color}, 0 0 8px ${color}`, width: size, height: size }
+    ? {
+        background: "#000",
+        boxShadow: `0 0 0 1.5px ${color}, 0 0 8px ${color}`,
+        width: size,
+        height: size,
+      }
     : { background: color, boxShadow: `0 0 8px ${color}`, width: size, height: size };
   return <span className="inline-block rounded-full align-middle" style={style} />;
 }
-
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
@@ -719,9 +747,7 @@ function computeDepths(state: AdventureState): Record<string, number> {
   return depths;
 }
 
-function positionNodes(
-  state: AdventureState,
-): Record<string, { x: number; y: number }> {
+function positionNodes(state: AdventureState): Record<string, { x: number; y: number }> {
   const center = { x: 200, y: 200 };
   const positions: Record<string, { x: number; y: number }> = {};
   const startId = state.homeRealmId;
@@ -748,10 +774,8 @@ function positionNodes(
     const angleSpan = angleEnd - angleStart;
     children.forEach((child, idx) => {
       visited.add(child);
-      const t =
-        children.length === 1 ? 0.5 : idx / (children.length - 1 || 1);
-      const jitter =
-        children.length === 1 ? GOLDEN * (depth + 1) * 0.5 : 0;
+      const t = children.length === 1 ? 0.5 : idx / (children.length - 1 || 1);
+      const jitter = children.length === 1 ? GOLDEN * (depth + 1) * 0.5 : 0;
       const angle = angleStart + t * angleSpan + jitter;
       const r = 55 + depth * 42;
       positions[child] = {
