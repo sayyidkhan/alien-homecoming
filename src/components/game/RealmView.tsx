@@ -51,6 +51,7 @@ export function RealmView({
   disabled,
   adventureId,
   echoesCollected,
+  onArtReady,
 }: {
   realm: RealmNode;
   alienX: number;
@@ -61,9 +62,11 @@ export function RealmView({
   disabled?: boolean;
   adventureId: string;
   echoesCollected: number;
+  onArtReady?: (realmId: string) => void;
 }) {
   const cachedInit = getCachedArt(realm.seed);
   const [art, setArt] = useState<string | null>(cachedInit);
+  const [artSeed, setArtSeed] = useState<string | null>(cachedInit ? realm.seed : null);
   const [isFinal, setIsFinal] = useState<boolean>(!!cachedInit);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,10 +80,12 @@ export function RealmView({
     const cached = getCachedArt(realm.seed);
     if (cached) {
       setArt(cached);
+      setArtSeed(realm.seed);
       setIsFinal(true);
       return;
     }
     setArt(null);
+    setArtSeed(null);
     setIsFinal(false);
 
     let alive = true;
@@ -90,6 +95,7 @@ export function RealmView({
       (dataUrl, final) => {
         if (!alive) return;
         setArt(dataUrl);
+        setArtSeed(realm.seed);
         setIsFinal(final);
       },
       undefined,
@@ -100,6 +106,10 @@ export function RealmView({
       alive = false;
     };
   }, [realm.seed, realmPrompt, paintAttempt]);
+
+  useEffect(() => {
+    if (art && artSeed === realm.seed) onArtReady?.(realm.id);
+  }, [art, artSeed, onArtReady, realm.id, realm.seed]);
 
   // Background prewarm: speculatively plan the destination realm for each
   // unexplored portal and start painting its art now, so it's ready (or
@@ -137,6 +147,8 @@ export function RealmView({
     if (!hovered) return 0;
     return hovered.shape.x + hovered.shape.w / 2 > alienX ? 1 : -1;
   }, [hoverPortal, realm.portals, alienX]);
+
+  const isBackPortalLabelVisible = hoverPortal?.startsWith("portal_back_") ?? false;
 
   useEffect(() => {
     if (!justCelebrated) return;
@@ -258,7 +270,7 @@ export function RealmView({
       })}
 
       {/* Back-portal breadcrumb hint — pulses in from time to time */}
-      {realm.portals.some((p) => p.id.startsWith("portal_back_")) && (
+      {realm.portals.some((p) => p.id.startsWith("portal_back_")) && !isBackPortalLabelVisible && (
         <div className="back-guide-hint pointer-events-none absolute bottom-4 left-4 z-30 rounded-full border border-cyan-200/25 bg-black/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.28em] text-cyan-100/90 backdrop-blur">
           ↩ Glowing blue portal returns you the way you came
         </div>

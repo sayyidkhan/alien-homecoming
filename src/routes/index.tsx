@@ -60,6 +60,11 @@ function GameInner() {
   const [toast, setToast] = useState<string | null>(null);
   const [intro, setIntro] = useState(state.visitedRealmIds.length === 1);
   const [atlasOpen, setAtlasOpen] = useState(false);
+  const [cutscene, setCutscene] = useState<null | {
+    label: string;
+    crossed: boolean;
+    destinationReady: boolean;
+  }>(null);
 
   useEffect(() => {
     if (!intro) return;
@@ -75,6 +80,14 @@ function GameInner() {
     [collectDiscovery],
   );
 
+  const startCutscene = useCallback(
+    (portalId: string, label: string) => {
+      beginTransition(portalId, label);
+      setCutscene({ label, crossed: false, destinationReady: false });
+    },
+    [beginTransition],
+  );
+
   const handlePortalActivate = useCallback(
     (portal: {
       id: string;
@@ -84,9 +97,9 @@ function GameInner() {
       const targetX = Math.max(0.08, Math.min(0.92, portal.shape.x + portal.shape.w / 2));
       const targetY = Math.max(0.55, Math.min(0.84, portal.shape.y + portal.shape.h / 2 + 0.08));
       moveAlien(targetX, targetY);
-      window.setTimeout(() => beginTransition(portal.id, portal.title), 550);
+      window.setTimeout(() => startCutscene(portal.id, portal.title), 550);
     },
-    [beginTransition, moveAlien],
+    [moveAlien, startCutscene],
   );
 
   const handleJump = useCallback(
@@ -95,9 +108,9 @@ function GameInner() {
       if (!state.visitedRealmIds.includes(realmId)) return;
       const dest = state.realms[realmId];
       if (!dest) return;
-      beginTransition(`__jump__${realmId}`, dest.title);
+      startCutscene(`__jump__${realmId}`, dest.title);
     },
-    [state.currentRealmId, state.visitedRealmIds, state.realms, beginTransition],
+    [state.currentRealmId, state.visitedRealmIds, state.realms, startCutscene],
   );
 
   if (!currentRealm) {
@@ -113,9 +126,16 @@ function GameInner() {
         onMoveAlien={moveAlien}
         onPortalActivate={handlePortalActivate}
         onDiscovery={handleDiscovery}
-        disabled={!!transitioning}
+        disabled={!!cutscene || !!transitioning}
         adventureId={state.adventureId}
         echoesCollected={state.homeEchoes.length}
+        onArtReady={() => {
+          setCutscene((scene) =>
+            scene?.crossed && !scene.destinationReady
+              ? { ...scene, destinationReady: true }
+              : scene,
+          );
+        }}
       />
 
       <HUD
@@ -130,7 +150,18 @@ function GameInner() {
       {atlasOpen && (
         <WorldAtlas state={state} onClose={() => setAtlasOpen(false)} onJump={handleJump} />
       )}
-      {transitioning && <Transition label={transitioning.label} onDone={finishTransition} />}
+      {cutscene && (
+        <Transition
+          label={cutscene.label}
+          crossed={cutscene.crossed}
+          destinationReady={cutscene.destinationReady}
+          onCross={() => {
+            finishTransition();
+            setCutscene((scene) => (scene ? { ...scene, crossed: true } : scene));
+          }}
+          onDone={() => setCutscene(null)}
+        />
+      )}
       {intro && <IntroOverlay />}
     </div>
   );
