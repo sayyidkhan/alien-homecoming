@@ -9,61 +9,65 @@ export function HUD({
   onReset,
   ended,
   currentSeed,
+  hidden = false,
 }: {
   realm: RealmNode;
   echoes: HomeEcho[];
   onReset: () => void;
   ended: boolean;
   currentSeed: string;
+  hidden?: boolean;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <>
-      <div className="hud-top pointer-events-none absolute inset-x-0 top-0 z-40 p-4">
-        <div
-          className={`hud-flip-card pointer-events-auto ${detailsOpen ? "hud-flip-card-open" : ""}`}
-        >
-          <div className="hud-flip-card-inner">
-            <section className="hud-flip-card-face rounded-xl border border-white/10 bg-black/25 px-4 py-3 backdrop-blur-md">
-              <button
-                type="button"
-                onClick={() => setDetailsOpen(true)}
-                className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full border border-white/10 text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
-                aria-label="Show journey details"
-                title="Journey details"
-              >
-                ⋯
-              </button>
-              <div className="pr-9 text-[10px] uppercase tracking-[0.3em] text-white/60">
-                {realm.special === "start"
-                  ? "The Threshold"
-                  : realm.special === "false_home"
-                    ? "A place that isn't quite"
-                    : realm.special === "real_home"
-                      ? "Home"
-                      : `Realm · depth ${realm.depth}`}
-              </div>
-              <h1 className="mt-0.5 font-serif text-xl text-white/95">{realm.title}</h1>
-              <p className="mt-1 max-h-9 overflow-hidden text-xs leading-relaxed text-white/70">
-                {realm.description}
-              </p>
-            </section>
-            <section className="hud-flip-card-face hud-flip-card-back rounded-xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
-              <button
-                type="button"
-                onClick={() => setDetailsOpen(false)}
-                className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full border border-white/10 text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
-                aria-label="Return to realm details"
-                title="Back to realm"
-              >
-                ×
-              </button>
-              <JourneyDetails echoes={echoes} onReset={onReset} currentSeed={currentSeed} />
-            </section>
+      {!hidden && (
+        <div className="hud-top pointer-events-none absolute inset-x-0 top-0 z-40 p-4">
+          <div
+            className={`hud-flip-card pointer-events-auto ${detailsOpen ? "hud-flip-card-open" : ""}`}
+          >
+            <div className="hud-flip-card-inner">
+              <section className="hud-flip-card-face rounded-xl border border-white/10 bg-black/25 px-4 py-3 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(true)}
+                  className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full border border-white/10 text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Show journey details"
+                  title="Journey details"
+                >
+                  ⋯
+                </button>
+                <div className="pr-9 text-[10px] uppercase tracking-[0.3em] text-white/60">
+                  {realm.special === "start"
+                    ? "The Threshold"
+                    : realm.special === "false_home"
+                      ? "A place that isn't quite"
+                      : realm.special === "real_home"
+                        ? "Home"
+                        : `Realm · depth ${realm.depth}`}
+                </div>
+                <h1 className="mt-0.5 font-serif text-xl text-white/95">{realm.title}</h1>
+                <p className="mt-1 max-h-9 overflow-hidden text-xs leading-relaxed text-white/70">
+                  {realm.description}
+                </p>
+              </section>
+              <section className="hud-flip-card-face hud-flip-card-back rounded-xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(false)}
+                  className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full border border-white/10 text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Return to realm details"
+                  title="Back to realm"
+                >
+                  ×
+                </button>
+                <JourneyDetails echoes={echoes} onReset={onReset} currentSeed={currentSeed} />
+              </section>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {ended && <EndingBanner onReset={onReset} />}
     </>
   );

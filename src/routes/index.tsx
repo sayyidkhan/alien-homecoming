@@ -60,6 +60,7 @@ function GameInner() {
   const [toast, setToast] = useState<string | null>(null);
   const [intro, setIntro] = useState(state.visitedRealmIds.length === 1);
   const [atlasOpen, setAtlasOpen] = useState(false);
+  const [interfaceVisible, setInterfaceVisible] = useState(true);
 
   useEffect(() => {
     if (!intro) return;
@@ -124,9 +125,15 @@ function GameInner() {
         onReset={resetAdventure}
         ended={state.ended}
         currentSeed={currentRealm.seed}
+        hidden={!interfaceVisible}
       />
       <DiscoveryToast message={toast} />
-      <Minimap state={state} onJump={handleJump} onOpenAtlas={() => setAtlasOpen(true)} />
+      <Minimap
+        state={state}
+        onJump={handleJump}
+        onOpenAtlas={() => setAtlasOpen(true)}
+        onInterfaceVisibilityChange={setInterfaceVisible}
+      />
       {atlasOpen && (
         <WorldAtlas state={state} onClose={() => setAtlasOpen(false)} onJump={handleJump} />
       )}

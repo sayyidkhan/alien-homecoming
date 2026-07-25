@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import type { AdventureState, RealmNode } from "@/game/types";
 
 type ViewMode = "2d" | "3d";
@@ -27,13 +28,16 @@ export function Minimap({
   state,
   onJump,
   onOpenAtlas,
+  onInterfaceVisibilityChange,
 }: {
   state: AdventureState;
   onJump: (realmId: string) => void;
   onOpenAtlas: () => void;
+  onInterfaceVisibilityChange?: (visible: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  const [chartVisible, setChartVisible] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [chartSize, setChartSize] = useState(280);
   const [mode, setMode] = useState<ViewMode>("2d");
@@ -217,22 +221,44 @@ export function Minimap({
 
   return (
     <>
-      <button
-        type="button"
-        className={`minimap-launcher ${collapsed ? "" : "minimap-launcher-hidden"}`}
-        onClick={() => setCollapsed(false)}
-        aria-label={`Open star chart with ${state.visitedRealmIds.length} discovered worlds`}
-      >
-        <span className="minimap-launcher-star" aria-hidden>
-          ✦
-        </span>
-        <span>star chart</span>
-        <span className="minimap-launcher-count">{state.visitedRealmIds.length}</span>
-      </button>
-      <div
-        className={`minimap ${expanded ? "minimap-expanded" : ""} ${fullscreen ? "minimap-fullscreen" : ""} ${collapsed && !fullscreen ? "minimap-collapsed" : ""}`}
-        style={fullscreen ? undefined : { width: size, height: size }}
-      >
+      {collapsed && (
+        <div className="minimap-launcher-group">
+          <button
+            type="button"
+            className="minimap-visibility-toggle"
+            onClick={() =>
+              setChartVisible((visible) => {
+                const nextVisible = !visible;
+                onInterfaceVisibilityChange?.(nextVisible);
+                return nextVisible;
+              })
+            }
+            aria-label={chartVisible ? "Hide star chart" : "Show star chart"}
+            title={chartVisible ? "Hide star chart" : "Show star chart"}
+          >
+            {chartVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+          {chartVisible && (
+            <button
+              type="button"
+              className="minimap-launcher"
+              onClick={() => setCollapsed(false)}
+              aria-label={`Open star chart with ${state.visitedRealmIds.length} discovered worlds`}
+            >
+              <span className="minimap-launcher-star" aria-hidden>
+                ✦
+              </span>
+              <span>star chart</span>
+              <span className="minimap-launcher-count">{state.visitedRealmIds.length}</span>
+            </button>
+          )}
+        </div>
+      )}
+      {chartVisible && (
+        <div
+          className={`minimap ${expanded ? "minimap-expanded" : ""} ${fullscreen ? "minimap-fullscreen" : ""} ${collapsed && !fullscreen ? "minimap-collapsed" : ""}`}
+          style={fullscreen ? undefined : { width: size, height: size }}
+        >
         <div className="minimap-cosmos" aria-hidden />
         <div className="minimap-window-controls" aria-label="Star chart window controls">
           <button
@@ -536,7 +562,8 @@ export function Minimap({
             )}
           </div>
         )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
