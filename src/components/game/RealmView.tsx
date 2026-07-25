@@ -149,6 +149,7 @@ export function RealmView({
   }, [hoverPortal, realm.portals, alienX]);
 
   const isBackPortalLabelVisible = hoverPortal?.startsWith("portal_back_") ?? false;
+  const backPortal = realm.portals.find((portal) => portal.id.startsWith("portal_back_"));
 
   useEffect(() => {
     if (!justCelebrated) return;
@@ -196,6 +197,11 @@ export function RealmView({
         <RealmLoading
           title={realm.title}
           seed={realm.seed}
+          alienX={alienX}
+          alienY={alienY}
+          onMoveAlien={onMoveAlien}
+          backPortal={backPortal}
+          onPortalActivate={onPortalActivate}
           onRetry={() => setPaintAttempt((n) => n + 1)}
         />
       )}
@@ -284,10 +290,20 @@ export function RealmView({
 function RealmLoading({
   title,
   seed,
+  alienX,
+  alienY,
+  onMoveAlien,
+  backPortal,
+  onPortalActivate,
   onRetry,
 }: {
   title: string;
   seed: string;
+  alienX: number;
+  alienY: number;
+  onMoveAlien: (x: number, y: number) => void;
+  backPortal?: Portal;
+  onPortalActivate: (portal: Portal) => void;
   onRetry: () => void;
 }) {
   const { status, progress, createdAt, startedAt, lastFrameAt, error } = useSeedProgress(seed);
@@ -322,9 +338,43 @@ function RealmLoading({
               ? `Painting · ${pct}%`
               : "Painting a new universe";
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#05030f]">
+    <div
+      className="absolute inset-0 z-[60] flex cursor-crosshair flex-col items-center justify-center overflow-hidden bg-[#05030f] select-none"
+      onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        onMoveAlien(Math.max(0.04, Math.min(0.96, x)), Math.max(0.08, Math.min(0.94, y)));
+      }}
+    >
       <div className="loading-starfield absolute inset-0" />
       <div className="loading-nebula absolute inset-0" />
+      <Alien x={alienX} y={alienY} size={42} />
+      {backPortal && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onPortalActivate(backPortal);
+          }}
+          className="portal-hit portal-available portal-back group absolute z-40 rounded-2xl outline-none"
+          style={{
+            left: `${backPortal.shape.x * 100}%`,
+            top: `${backPortal.shape.y * 100}%`,
+            width: `${backPortal.shape.w * 100}%`,
+            height: `${backPortal.shape.h * 100}%`,
+          }}
+          aria-label={`Return through ${backPortal.title}`}
+        >
+          <span className="portal-glow" />
+          <span className="portal-back-arrow" aria-hidden>
+            ↩
+          </span>
+          <span className="portal-label">
+            ◂ {backPortal.title}
+          </span>
+        </button>
+      )}
       <div className="relative flex flex-col items-center gap-6">
         <div className="loading-orb relative h-28 w-28">
           <div className="loading-orb-core absolute inset-0 rounded-full" />
@@ -369,7 +419,10 @@ function RealmLoading({
         {status === "failed" && (
           <button
             type="button"
-            onClick={onRetry}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRetry();
+            }}
             className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-[10px] uppercase tracking-[0.24em] text-white/90 transition hover:bg-white/20"
           >
             Try again
