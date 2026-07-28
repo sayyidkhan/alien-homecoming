@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "alien-homecoming-universe",
-  "account_id": "33769724ec37d24a4b8a66ff0d97b1a9",
+  "account_id": "7fb7507f5c3622245a31dbbfcd834f7d",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-18",
   "workers_dev": true,
@@ -23,7 +23,7 @@
     {
       "binding": "DB",
       "database_name": "alien-homecoming-universe",
-      "database_id": "816fafe7-dd74-450c-8046-8b1cf305588d",
+      "database_id": "89548da1-32eb-4b5c-b822-696677a6ac3b",
     },
   ],
   "vars": {
